@@ -44,14 +44,15 @@ jobs:
           mktemp && echo "mktemp ok" || echo "mktemp CẦN template"
           echo "--- report ---"
           /bin/bash ./declutter --report || true
-          echo "--- chạy THẬT, in output ---"
-          /bin/bash ./declutter --yes; echo "exit=$?"
+          echo "--- chạy THẬT với trace ---"
+          set +e
+          /bin/bash -x ./declutter --yes > "$SB/out.txt" 2> "$SB/trace.txt"
+          echo "exit=$?"
+          echo "--- stdout ---"; cat "$SB/out.txt"
+          echo "--- 60 dòng trace cuối ---"; tail -60 "$SB/trace.txt"
           echo "--- còn lại trên đĩa ---"
-          ls -la "$HOME/.claude/" "$HOME/.config/Code/" 2>&1 || true
-          echo "--- log ---"
-          cat "$DECLUTTER_LOG" 2>&1 || echo "(không có log)"
-          echo "--- env ---"
-          echo "HOME=$HOME  LOG=$DECLUTTER_LOG  TMPDIR=$TMPDIR"
+          ls -la "$HOME/.claude/" "$HOME/.config/Code/" 2>&1
+          echo "--- log ---"; cat "$DECLUTTER_LOG" 2>&1 || echo "(không có log)"
 
       - name: Test (bash hệ thống)
         run: /bin/bash tests/run.sh
