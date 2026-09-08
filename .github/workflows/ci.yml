@@ -1,0 +1,35 @@
+name: ci
+on: [push, pull_request]
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Phiên bản bash
+        run: bash --version | head -1; /bin/bash --version | head -1
+
+      - name: Kiểm tra cú pháp
+        run: |
+          for f in declutter lib/*.sh modules/*.sh tests/*.sh install.sh; do
+            bash -n "$f" || exit 1
+          done
+
+      # macOS ship bash 3.2 ở /bin/bash — chạy test bằng đúng bản đó để chắc
+      # không lỡ dùng cú pháp bash 4+ (declare -A, mapfile, ${var,,}…)
+      - name: Test (bash hệ thống)
+        run: /bin/bash tests/run.sh
+
+      - name: shellcheck
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y shellcheck
+          shellcheck -S warning -x declutter lib/*.sh modules/*.sh || true
+
+      - name: Smoke test --report
+        run: NO_COLOR=1 ./declutter --report | head -20

@@ -1,0 +1,148 @@
+#!/usr/bin/env bash
+#
+# declutter — dọn rác máy dev (Ubuntu + macOS), tập trung vào rác của công cụ AI.
+# https://github.com/phamquyetthang/declutter
+#
+# Mặc định: quét, hiện danh sách có checkbox, mục an toàn được tick sẵn.
+# Không xóa gì cho tới khi bạn bấm Enter.
+
+set -o pipefail
+
+# ── tìm thư mục cài đặt (theo được cả symlink trong /usr/local/bin) ──────────
+_src="${BASH_SOURCE[0]}"
+while [ -L "$_src" ]; do
+  _dir="$(cd -P "$(dirname "$_src")" && pwd)"
+  _src="$(readlink "$_src")"
+  case "$_src" in /*) ;; *) _src="$_dir/$_src" ;; esac
+done
+DECLUTTER_ROOT="$(cd -P "$(dirname "$_src")" && pwd)"
+export DECLUTTER_ROOT
+
+for _lib in core registry actions ui runner projects; do
+  # shellcheck disable=SC1090
+  . "$DECLUTTER_ROOT/lib/$_lib.sh" || { echo "Thiếu lib/$_lib.sh" >&2; exit 1; }
+done
+
+# ── mặc định ────────────────────────────────────────────────────────────────
+LEVEL=green; ASSUME_YES=0; DEEP=0; PROJECTS_ONLY=0; DRY_RUN=0
+USE_SUDO=auto; QUIET=0; ONLY=""; SKIP=""; PROJ_DAYS=60; TOP=15
+INTERACTIVE=auto; SCAN_ROOT="$HOME"
+LOG="${DECLUTTER_LOG:-$HOME/.declutter.log}"
+
+usage() {
+  cat <<USAGE
+${B}declutter $DECLUTTER_VERSION${R} — dọn rác máy dev (Ubuntu + macOS)
+
+${B}CÁCH DÙNG${R}
+  declutter                     Quét → danh sách có checkbox → Enter để dọn.
+                                Mục an toàn được tick sẵn. Không xóa gì trước đó.
+  declutter --report            Chỉ in danh sách rồi thoát (không tương tác).
+  declutter --yes               Bỏ qua bước chọn, dọn thẳng các mục an toàn.
+  declutter --yes -l yellow     Dọn cả mức "cân nhắc".
+  declutter --dry-run --yes     Chạy thử, ghi ra log những gì SẼ xóa.
+  declutter --projects          Liệt kê node_modules/target/.venv nặng.
+
+${B}TÙY CHỌN${R}
+  -l, --level LEVEL   green (mặc định) | yellow    — mức tối đa được tick sẵn
+                      Mục "tự quyết" (đỏ) không bao giờ được chọn tự động.
+  -y, --yes           Không hiện danh sách, chạy luôn theo --level
+  -n, --dry-run       Không xóa gì, chỉ ghi vào log những gì sẽ xóa
+      --report        In danh sách rồi thoát
+      --only  A,B     Chỉ các nhóm này (ai-cli, ai-ide, ai-ml, os, xcode,
+                      pkg-node, pkg-python, pkg-rust, pkg-go, pkg-java,
+                      docker, browser)
+      --skip  A,B     Bỏ qua các nhóm này
+      --deep          Bật các phép quét chậm (rà __pycache__ toàn \$HOME)
+      --projects [DIR]  Liệt kê artifact nặng của project (mặc định \$HOME)
+      --days N        Ngưỡng "cũ" cho transcript và --projects (mặc định 60)
+      --top N         Số dòng tối đa khi liệt kê (mặc định 15)
+      --sudo yes|no   Ép dùng / không dùng sudo (mặc định tự dò)
+      --log FILE      File log (mặc định ~/.declutter.log)
+  -q, --quiet         Bớt chữ
+  -V, --version       In phiên bản
+  -h, --help          Trợ giúp này
+
+${B}PHÍM TRONG DANH SÁCH${R}
+  ↑↓ hoặc j/k  di chuyển      space  tick / bỏ tick
+  a  đảo tất cả               o      chỉ chọn mục an toàn
+  n  bỏ chọn hết              Enter  DỌN     q  thoát
+USAGE
+}
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -l|--level)  LEVEL="$2"; shift ;;
+    -y|--yes)    ASSUME_YES=1 ;;
+    -n|--dry-run) DRY_RUN=1 ;;
+    --report)    INTERACTIVE=no ;;
+    --only)      ONLY="$2"; shift ;;
+    --skip)      SKIP="$2"; shift ;;
+    --deep)      DEEP=1 ;;
+    --projects)  PROJECTS_ONLY=1
+                 case "${2:-}" in -*|"") ;; *) SCAN_ROOT="$2"; shift ;; esac ;;
+    --days)      PROJ_DAYS="$2"; shift ;;
+    --top)       TOP="$2"; shift ;;
+    --sudo)      USE_SUDO="$2"; shift ;;
+    --log)       LOG="$2"; shift ;;
+    -q|--quiet)  QUIET=1 ;;
+    -V|--version) echo "declutter $DECLUTTER_VERSION"; exit 0 ;;
+    -h|--help)   usage; exit 0 ;;
+    *) echo "Tùy chọn lạ: $1  (xem --help)" >&2; exit 2 ;;
+  esac
+  shift
+done
+
+case "$LEVEL" in
+  green|yellow) ;;
+  red) echo "--level red không được phép: mục đỏ luôn phải do bạn tự xử lý." >&2; exit 2 ;;
+  *) echo "--level phải là green hoặc yellow" >&2; exit 2 ;;
+esac
+
+[ "$PLATFORM" = other ] && die "Chỉ hỗ trợ Linux và macOS (phát hiện: $OS_NAME)"
+setup_sudo
+
+if [ "$PROJECTS_ONLY" = 1 ]; then scan_projects "$SCAN_ROOT"; exit 0; fi
+
+head1 "declutter $DECLUTTER_VERSION — $PLATFORM — $(human "$(free_kb)") trống trên /"
+say "${DIM}Đang quét…${R}"
+register_all
+build_order
+
+if [ "${#ORDER[@]}" -eq 0 ]; then
+  say "Không tìm thấy gì để dọn. Máy sạch."
+  exit 0
+fi
+
+# Với --level green thì bỏ tick sẵn của mức yellow (build_order đã làm),
+# với --level yellow thì tick sẵn luôn cả yellow.
+if [ "$LEVEL" = yellow ]; then
+  for ((_i=0; _i<${#ORDER[@]}; _i++)); do
+    [ "${I_LEVEL[${ORDER[$_i]}]}" = red ] || SEL[$_i]=1
+  done
+fi
+
+if [ "$INTERACTIVE" = no ]; then
+  print_plain_list
+  exit 0
+fi
+
+if [ "$ASSUME_YES" = 1 ]; then
+  print_plain_list
+  run_selection
+  exit 0
+fi
+
+if [ ! -t 0 ] || [ ! -t 1 ]; then
+  print_plain_list
+  say ""
+  say "  ${DIM}(không phải terminal tương tác — dùng --yes để chạy thật)${R}"
+  exit 0
+fi
+
+if pick_interactive; then
+  printf '\033[?25h'
+  run_selection
+else
+  printf '\033[?25h'
+  say "Đã thoát, không xóa gì."
+fi

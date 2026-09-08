@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# projects.sh — liệt kê artifact nặng của project. CHỈ liệt kê, không bao giờ xóa:
+# node_modules/target/.venv là thứ chỉ bạn mới biết project nào còn dùng.
+
+scan_projects() {
+  local root="${1:-$HOME}" name found tmp p kb total count
+  head1 "Project artifacts dưới $root (chỉ liệt kê — tool không tự xóa nhóm này)"
+  say "${DIM}Đang quét, có thể mất một lúc…${R}"
+
+  for name in node_modules target .venv venv .next dist build __pycache__ .aider.tags.cache.v3; do
+    found=$(find "$root" -name "$name" -type d -prune 2>/dev/null | head -500)
+    [ -n "$found" ] || continue
+    tmp=$(mktemp 2>/dev/null || printf '%s' "${TMPDIR:-/tmp}/declutter.proj.$$")
+    total=0; count=0
+    while IFS= read -r p; do
+      [ -n "$p" ] || continue
+      kb=$(du -sk "$p" 2>/dev/null | awk 'NR==1{print $1}')
+      case "$kb" in ''|*[!0-9]*) kb=0 ;; esac
+      total=$((total + kb)); count=$((count + 1))
+      printf '%s\t%s\n' "$kb" "$p" >> "$tmp"
+    done <<< "$found"
+    printf '\n  %s%s%s — %s ở %d nơi\n' "$B" "$name" "$R" "$(human "$total")" "$count"
+    sort -rn "$tmp" 2>/dev/null | head -"${TOP:-15}" | while IFS=$'\t' read -r kb p; do
+      printf '     %8s  %s\n' "$(human "$kb")" "$p"
+    done
+    rm -f "$tmp"
+  done
+
+  printf '\n  %sLọc project bỏ hoang trên %s ngày:%s\n' "$B" "${PROJ_DAYS:-60}" "$R"
+  printf '     find %s -name node_modules -type d -prune -mtime +%s -print\n' "$root" "${PROJ_DAYS:-60}"
+  printf '  %sXem kỹ danh sách rồi mới thêm -exec rm -rf {} +%s\n' "$DIM" "$R"
+}
