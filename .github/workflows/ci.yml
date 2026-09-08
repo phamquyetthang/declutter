@@ -1,5 +1,10 @@
 name: ci
-on: [push, pull_request]
+
+# Manual only: this workflow runs when you dispatch it, never on push or on a
+# pull request. Trigger it from the Actions tab, or with:
+#   gh workflow run ci --repo quytstudio/declutter
+on:
+  workflow_dispatch:
 
 jobs:
   test:

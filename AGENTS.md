@@ -79,6 +79,10 @@ list in both `usage_en`/`usage_vi`, and to both completion files.
 /bin/bash tests/run.sh  # on macOS: exercise bash 3.2 specifically
 ```
 
+CI is **manual-only** (`workflow_dispatch`) — nothing runs on push or on a pull
+request. Dispatch it with `gh workflow run ci`, and never assume a green tick
+appeared on its own; the local suite is your feedback loop.
+
 The suite exports `DECLUTTER_SKIP_CMD=1` because `cmd` items (`docker builder
 prune`, `apt clean`, `brew cleanup`) are **not** contained by the fake `$HOME` —
 they act on the real daemon and the real system. If you add a `cmd` item, the

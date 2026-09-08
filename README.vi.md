@@ -162,7 +162,7 @@ Xcode `DerivedData` trên macOS, và Docker build cache. Chạy `declutter --rep
 ### Có chạy trên macOS không?
 
 Có — macOS và Ubuntu/Debian là hai nền tảng được hỗ trợ, cùng một script. Nó chạy
-được với bash 3.2 mà macOS ship sẵn, và CI test mọi commit trên `macos-latest`
+được với bash 3.2 mà macOS ship sẵn, và CI chạy trên `macos-latest`
 bằng đúng `/bin/bash` vì lý do đó. Nhóm Xcode, Homebrew, simulator và iOS
 DeviceSupport chỉ có trên macOS.
 

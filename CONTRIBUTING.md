@@ -53,6 +53,9 @@ one that deletes something irreplaceable is a bug nobody forgives.
 
 - One topic per PR.
 - `./tests/run.sh` green. On macOS, also `/bin/bash tests/run.sh`.
+- CI does **not** run automatically on a push or a PR — it is manual-only
+  (`workflow_dispatch`). A maintainer dispatches it from the Actions tab, or with
+  `gh workflow run ci`. So run the suite locally before you open the PR.
 - Update `README.md` **and** `README.vi.md` if behaviour changed, plus `llms.txt`
   if you added or changed a flag.
 - Add an entry to `CHANGELOG.md` under a new "Unreleased" heading.

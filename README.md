@@ -169,7 +169,7 @@ cache, Xcode `DerivedData` on macOS, and the Docker build cache. Run
 ### Does it work on macOS?
 
 Yes — macOS and Ubuntu/Debian are the two supported platforms, from the same
-script. It runs on the bash 3.2 that macOS ships, and CI tests every commit on
+script. It runs on the bash 3.2 that macOS ships, and CI exercises
 `macos-latest` with `/bin/bash` specifically for that reason. Xcode, Homebrew,
 simulator and iOS DeviceSupport cleanup are macOS-only groups.
 

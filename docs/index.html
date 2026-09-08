@@ -94,7 +94,7 @@
       "name": "Does it work on macOS?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Yes. macOS and Ubuntu/Debian are the two supported platforms from the same script. It runs on the bash 3.2 that macOS ships, and CI tests every commit on macos-latest with /bin/bash for that reason. Xcode, Homebrew, simulator and iOS DeviceSupport cleanup are macOS-only groups."
+        "text": "Yes. macOS and Ubuntu/Debian are the two supported platforms from the same script. It runs on the bash 3.2 that macOS ships, and CI exercises macos-latest with /bin/bash for that reason. Xcode, Homebrew, simulator and iOS DeviceSupport cleanup are macOS-only groups."
       }
     },
     {
@@ -311,7 +311,7 @@ declutter --lang vi        # Vietnamese interface (auto-detected from $LANG)</co
 <h3>Does it work on macOS?</h3>
 <p>
   Yes — macOS and Ubuntu/Debian, from the same script. It runs on the bash 3.2 that macOS
-  ships, and CI tests every commit on <code>macos-latest</code> with <code>/bin/bash</code> for
+  ships, and CI exercises <code>macos-latest</code> with <code>/bin/bash</code> for
   that reason.
 </p>
 
