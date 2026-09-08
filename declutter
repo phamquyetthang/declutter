@@ -2,7 +2,7 @@
 #
 # declutter — reclaim disk space on a dev machine (Ubuntu + macOS), with a focus
 # on the junk AI tools leave behind.
-# https://github.com/phamquyetthang/declutter
+# https://github.com/quytstudio/declutter
 #
 # Default behaviour: scan, show a checkbox list, pre-tick the safe items.
 # Nothing is deleted until you press Enter.

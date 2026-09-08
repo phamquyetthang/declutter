@@ -2,7 +2,7 @@
 
 ## Reporting a vulnerability
 
-Open a [GitHub security advisory](https://github.com/phamquyetthang/declutter/security/advisories/new),
+Open a [GitHub security advisory](https://github.com/quytstudio/declutter/security/advisories/new),
 or an issue if the problem is not sensitive. Please include your OS, `bash
 --version`, and the smallest reproduction you can manage.
 

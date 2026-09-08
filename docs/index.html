@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>declutter — free up disk space on a dev machine (macOS &amp; Ubuntu)</title>
 <meta name="description" content="A pure-bash disk cleanup CLI for developers on macOS and Ubuntu. Reclaims space from AI tool caches — Claude Code, Cursor, VS Code, HuggingFace, Ollama — plus npm, Cargo, Gradle, Docker and Xcode. Nothing is deleted without your confirmation.">
-<link rel="canonical" href="https://phamquyetthang.github.io/declutter/">
+<link rel="canonical" href="https://quytstudio.github.io/declutter/">
 <meta name="theme-color" content="#0d1117">
 <meta name="author" content="phamquyetthang">
 <meta name="keywords" content="disk cleanup cli, free up disk space mac, clean disk space ubuntu, developer disk cleanup, clear xcode deriveddata, delete node_modules, huggingface cache clear, ollama model disk space, claude code cache, cursor cache cleanup, bash cleanup script">
@@ -14,13 +14,13 @@
 <meta property="og:site_name" content="declutter">
 <meta property="og:title" content="declutter — free up disk space on a dev machine">
 <meta property="og:description" content="Pure-bash disk cleanup CLI for macOS and Ubuntu, focused on the junk AI coding tools leave behind. Checkbox list with real sizes, three safety tiers, nothing deleted without confirmation.">
-<meta property="og:url" content="https://phamquyetthang.github.io/declutter/">
+<meta property="og:url" content="https://quytstudio.github.io/declutter/">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="declutter — free up disk space on a dev machine">
 <meta name="twitter:description" content="Pure-bash disk cleanup CLI for macOS and Ubuntu, focused on AI tool caches. Nothing deleted without confirmation.">
 
-<link rel="alternate" hreflang="en" href="https://phamquyetthang.github.io/declutter/">
-<link rel="alternate" hreflang="vi" href="https://github.com/phamquyetthang/declutter/blob/main/README.vi.md">
+<link rel="alternate" hreflang="en" href="https://quytstudio.github.io/declutter/">
+<link rel="alternate" hreflang="vi" href="https://github.com/quytstudio/declutter/blob/main/README.vi.md">
 
 <script type="application/ld+json">
 {
@@ -31,9 +31,9 @@
   "applicationSubCategory": "Command Line Utility",
   "operatingSystem": "macOS, Ubuntu, Debian",
   "description": "A disk cleanup CLI for developers on macOS and Ubuntu, written in pure bash with no dependencies. It scans the machine, shows a checkbox list with real sizes, pre-ticks only provably safe caches, and deletes nothing until confirmed. Its focus is the junk AI coding tools leave behind: Claude Code, Codex and Gemini CLI transcripts, AI chat webview storage in VS Code and Cursor, HuggingFace caches and Ollama model weights.",
-  "url": "https://phamquyetthang.github.io/declutter/",
-  "downloadUrl": "https://github.com/phamquyetthang/declutter",
-  "codeRepository": "https://github.com/phamquyetthang/declutter",
+  "url": "https://quytstudio.github.io/declutter/",
+  "downloadUrl": "https://github.com/quytstudio/declutter",
+  "codeRepository": "https://github.com/quytstudio/declutter",
   "programmingLanguage": "Shell",
   "softwareVersion": "1.1.0",
   "license": "https://opensource.org/licenses/MIT",
@@ -43,6 +43,11 @@
     "@type": "Person",
     "name": "phamquyetthang",
     "url": "https://github.com/phamquyetthang"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "quytstudio",
+    "url": "https://github.com/quytstudio"
   },
   "featureList": [
     "Interactive checkbox list showing real measured sizes",
@@ -175,7 +180,7 @@
 <div class="wrap">
 
 <header>
-  <p class="langbar">English · <a href="https://github.com/phamquyetthang/declutter/blob/main/README.vi.md">Tiếng Việt</a></p>
+  <p class="langbar">English · <a href="https://github.com/quytstudio/declutter/blob/main/README.vi.md">Tiếng Việt</a></p>
   <h1>declutter <span class="dim">— free up disk space on a dev machine</span></h1>
   <p class="lede">
     A disk cleanup CLI for developers on <strong>macOS</strong> and <strong>Ubuntu</strong>.
@@ -183,13 +188,13 @@
     provably safe, and deletes nothing until you press Enter.
   </p>
   <div class="badges">
-    <a href="https://github.com/phamquyetthang/declutter/actions/workflows/ci.yml"><img src="https://github.com/phamquyetthang/declutter/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
+    <a href="https://github.com/quytstudio/declutter/actions/workflows/ci.yml"><img src="https://github.com/quytstudio/declutter/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
     <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT license">
     <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Ubuntu-lightgrey.svg" alt="Platforms: macOS and Ubuntu">
     <img src="https://img.shields.io/badge/pure-bash%203.2%2B-89e051.svg" alt="Pure bash 3.2+">
   </div>
-  <a class="cta" href="https://github.com/phamquyetthang/declutter">View on GitHub</a>
-  <a class="cta ghost" href="https://github.com/phamquyetthang/declutter/blob/main/docs/GUIDE.md">Manual cleanup guide</a>
+  <a class="cta" href="https://github.com/quytstudio/declutter">View on GitHub</a>
+  <a class="cta ghost" href="https://github.com/quytstudio/declutter/blob/main/docs/GUIDE.md">Manual cleanup guide</a>
 </header>
 
 <h2>Why another cleaner?</h2>
@@ -207,7 +212,7 @@
 
 <h2>Install</h2>
 <p>One command, same on Linux and macOS:</p>
-<pre><code>curl -fsSL https://raw.githubusercontent.com/phamquyetthang/declutter/main/install.sh | bash</code></pre>
+<pre><code>curl -fsSL https://raw.githubusercontent.com/quytstudio/declutter/main/install.sh | bash</code></pre>
 <p>
   Installs into <code>~/.local/bin</code> (override with <code>PREFIX</code>). No git on the
   machine? It falls back to a tarball. Prefer not to install at all — clone it and run
@@ -323,16 +328,16 @@ declutter --lang vi        # Vietnamese interface (auto-detected from $LANG)</co
 
 <h2>Documentation</h2>
 <ul>
-  <li><a href="https://github.com/phamquyetthang/declutter#readme">README</a> — install, usage, safety tiers, FAQ</li>
-  <li><a href="https://github.com/phamquyetthang/declutter/blob/main/docs/GUIDE.md">Manual cleanup guide</a> — every command by hand for macOS and Ubuntu, each labelled with its safety tier</li>
-  <li><a href="https://github.com/phamquyetthang/declutter/blob/main/AGENTS.md">AGENTS.md</a> — repository conventions for contributors and coding agents</li>
-  <li><a href="https://github.com/phamquyetthang/declutter/blob/main/README.vi.md">Tiếng Việt</a> — Vietnamese documentation</li>
+  <li><a href="https://github.com/quytstudio/declutter#readme">README</a> — install, usage, safety tiers, FAQ</li>
+  <li><a href="https://github.com/quytstudio/declutter/blob/main/docs/GUIDE.md">Manual cleanup guide</a> — every command by hand for macOS and Ubuntu, each labelled with its safety tier</li>
+  <li><a href="https://github.com/quytstudio/declutter/blob/main/AGENTS.md">AGENTS.md</a> — repository conventions for contributors and coding agents</li>
+  <li><a href="https://github.com/quytstudio/declutter/blob/main/README.vi.md">Tiếng Việt</a> — Vietnamese documentation</li>
 </ul>
 
 <footer>
   MIT © <a href="https://github.com/phamquyetthang">phamquyetthang</a> ·
-  <a href="https://github.com/phamquyetthang/declutter">source</a> ·
-  <a href="https://github.com/phamquyetthang/declutter/issues">issues</a>
+  <a href="https://github.com/quytstudio/declutter">source</a> ·
+  <a href="https://github.com/quytstudio/declutter/issues">issues</a>
 </footer>
 
 </div>

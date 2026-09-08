@@ -2,7 +2,7 @@
 
 **English** · [Tiếng Việt](README.vi.md)
 
-[![ci](https://github.com/phamquyetthang/declutter/actions/workflows/ci.yml/badge.svg)](https://github.com/phamquyetthang/declutter/actions/workflows/ci.yml)
+[![ci](https://github.com/quytstudio/declutter/actions/workflows/ci.yml/badge.svg)](https://github.com/quytstudio/declutter/actions/workflows/ci.yml)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![platform: macOS | Ubuntu](https://img.shields.io/badge/platform-macOS%20%7C%20Ubuntu-lightgrey.svg)](#requirements)
 [![pure bash](https://img.shields.io/badge/pure-bash%203.2%2B-89e051.svg)](#requirements)
@@ -40,7 +40,7 @@ o = safe (pre-ticked)   ! = your call   x = manual only, not selectable
 One command, same on Linux and macOS:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/phamquyetthang/declutter/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/quytstudio/declutter/main/install.sh | bash
 ```
 
 Installs into `~/.local/bin` (override with `PREFIX=...`). If the machine has no
@@ -52,7 +52,7 @@ use (`~/.zshrc` on macOS, `~/.bashrc` on Linux).
 Or clone and run it in place — no install needed:
 
 ```bash
-git clone https://github.com/phamquyetthang/declutter.git
+git clone https://github.com/quytstudio/declutter.git
 cd declutter && ./declutter
 ```
 

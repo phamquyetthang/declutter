@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Install declutter into your PATH. One script for both Linux and macOS.
 #
-#   curl -fsSL https://raw.githubusercontent.com/phamquyetthang/declutter/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/quytstudio/declutter/main/install.sh | bash
 #
 # or, from a clone:
 #
@@ -11,7 +11,7 @@
 # Environment: PREFIX (default ~/.local)
 set -e
 
-REPO="phamquyetthang/declutter"
+REPO="quytstudio/declutter"
 BRANCH="main"
 PREFIX="${PREFIX:-$HOME/.local}"
 SHARE="$PREFIX/share/declutter"

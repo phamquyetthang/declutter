@@ -8,7 +8,7 @@
 > and Cursor, HuggingFace caches, Ollama model weights — which `apt clean` and
 > `brew cleanup` do not touch.
 
-Repository: https://github.com/phamquyetthang/declutter
+Repository: https://github.com/quytstudio/declutter
 License: MIT
 Language: bash
 Platforms: macOS (Intel & Apple Silicon), Ubuntu/Debian
@@ -16,7 +16,7 @@ Platforms: macOS (Intel & Apple Silicon), Ubuntu/Debian
 ## Install
 
 ```
-curl -fsSL https://raw.githubusercontent.com/phamquyetthang/declutter/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/quytstudio/declutter/main/install.sh | bash
 ```
 
 Installs to `~/.local/bin/declutter` (override with `PREFIX`). Uninstall with
@@ -71,8 +71,8 @@ repo, Timeshift/Time Machine snapshots, `node_modules` and `target/`.
 
 ## Docs
 
-- [README (English)](https://github.com/phamquyetthang/declutter/blob/main/README.md): install, usage, safety tiers, FAQ
-- [README (Tiếng Việt)](https://github.com/phamquyetthang/declutter/blob/main/README.vi.md)
-- [Manual cleanup guide (English)](https://github.com/phamquyetthang/declutter/blob/main/docs/GUIDE.md): every command by hand, each labelled with a safety tier
-- [Manual cleanup guide (Tiếng Việt)](https://github.com/phamquyetthang/declutter/blob/main/docs/GUIDE.vi.md)
-- [AGENTS.md](https://github.com/phamquyetthang/declutter/blob/main/AGENTS.md): repository conventions for coding agents
+- [README (English)](https://github.com/quytstudio/declutter/blob/main/README.md): install, usage, safety tiers, FAQ
+- [README (Tiếng Việt)](https://github.com/quytstudio/declutter/blob/main/README.vi.md)
+- [Manual cleanup guide (English)](https://github.com/quytstudio/declutter/blob/main/docs/GUIDE.md): every command by hand, each labelled with a safety tier
+- [Manual cleanup guide (Tiếng Việt)](https://github.com/quytstudio/declutter/blob/main/docs/GUIDE.vi.md)
+- [AGENTS.md](https://github.com/quytstudio/declutter/blob/main/AGENTS.md): repository conventions for coding agents

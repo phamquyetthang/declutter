@@ -2,7 +2,7 @@
 
 [English](README.md) · **Tiếng Việt**
 
-[![ci](https://github.com/phamquyetthang/declutter/actions/workflows/ci.yml/badge.svg)](https://github.com/phamquyetthang/declutter/actions/workflows/ci.yml)
+[![ci](https://github.com/quytstudio/declutter/actions/workflows/ci.yml/badge.svg)](https://github.com/quytstudio/declutter/actions/workflows/ci.yml)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![platform: macOS | Ubuntu](https://img.shields.io/badge/platform-macOS%20%7C%20Ubuntu-lightgrey.svg)](#yêu-cầu)
 [![pure bash](https://img.shields.io/badge/pure-bash%203.2%2B-89e051.svg)](#yêu-cầu)
@@ -38,7 +38,7 @@ o = an toàn (tick sẵn)   ! = cân nhắc   x = tự quyết, không chọn đ
 Cùng một lệnh cho cả Linux và macOS:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/phamquyetthang/declutter/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/quytstudio/declutter/main/install.sh | bash
 ```
 
 Cài vào `~/.local/bin` (đổi bằng `PREFIX=...`). Nếu máy chưa có `git` — hay gặp
@@ -49,7 +49,7 @@ file rc của shell bạn đang dùng (`~/.zshrc` cho macOS, `~/.bashrc` cho Lin
 Hoặc clone rồi chạy trực tiếp — không cần cài:
 
 ```bash
-git clone https://github.com/phamquyetthang/declutter.git
+git clone https://github.com/quytstudio/declutter.git
 cd declutter && ./declutter
 ```
 

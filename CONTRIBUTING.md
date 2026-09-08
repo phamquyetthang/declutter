@@ -4,7 +4,7 @@ Thanks for considering it. This is a small pure-bash project, so contributing is
 mostly: clone, edit, run the tests.
 
 ```bash
-git clone https://github.com/phamquyetthang/declutter.git
+git clone https://github.com/quytstudio/declutter.git
 cd declutter
 ./declutter --report     # see it work, deletes nothing
 ./tests/run.sh           # the suite, in a fake $HOME

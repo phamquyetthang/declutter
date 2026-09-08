@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://phamquyetthang.github.io/declutter/sitemap.xml
+Sitemap: https://quytstudio.github.io/declutter/sitemap.xml
