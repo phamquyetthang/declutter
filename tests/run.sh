@@ -213,7 +213,51 @@ else
   bad "install.sh --uninstall left something behind"
 fi
 
-printf '\n\033[1m11) every file parses\033[0m\n'
+printf '\n\033[1m11) cmd items: no invisible stdin hang, failures are logged\033[0m\n'
+# Unit level on purpose. The end-to-end runs set DECLUTTER_SKIP_CMD=1 because
+# `cmd` items hit the real daemon/system, but the plumbing AROUND them still has
+# to be tested — that plumbing is where the "stops forever at uv cache" bug was.
+cmd_probe() {   # $1 = shell snippet for the cmd item, $2 = log file
+  (
+    export DECLUTTER_SKIP_CMD=0 DECLUTTER_ROOT="$ROOT"
+    LOG="$2"; DRY_RUN=0; QUIET=1
+    . "$ROOT/lib/core.sh"; . "$ROOT/lib/i18n.sh"; i18n_detect; i18n_load
+    . "$ROOT/lib/registry.sh"; . "$ROOT/lib/actions.sh"
+    I_LEVEL=(); I_GROUP=(); I_DESC=(); I_ACTION=(); I_EXTRA=(); I_PATHS=()
+    add green os cmd "$1" "probe" ""
+    run_item 0; printf 'rc=%s kind=%s' "$?" "$RUN_FAIL_KIND"
+  )
+}
+
+# A cmd item must get EOF on stdin, not the terminal. Without </dev/null the
+# `read` below swallows the line piped into this test and exits 9 — which is
+# exactly how a command that prompts silently eats the user's keystrokes, or
+# blocks forever waiting for one with its prompt sent to /dev/null.
+res=$(printf 'stolen-line\n' | cmd_probe 'read -r _ && exit 9 || exit 0' "$SB/probe1.log")
+case "$res" in
+  'rc=0 kind=') ok "cmd item gets /dev/null on stdin (cannot steal input or hang)" ;;
+  *)            bad "cmd stdin is not /dev/null -> $res" ;;
+esac
+
+# A failing cmd must record its exit code AND its output; that is the whole
+# point of capturing instead of discarding.
+res=$(cmd_probe 'echo "boom-on-stderr" >&2; exit 3' "$SB/probe2.log")
+case "$res" in
+  'rc=3 kind=cmd') ok "failing cmd returns its real exit code, kind=cmd" ;;
+  *)               bad "failing cmd misreported -> $res" ;;
+esac
+grep -q 'cmd FAILED exit=3' "$SB/probe2.log" \
+  && ok "log records the exit code" || bad "log has no exit code"
+grep -q 'boom-on-stderr' "$SB/probe2.log" \
+  && ok "log records the command output" || bad "log lost the command output"
+
+res=$(cmd_probe 'true' "$SB/probe3.log")
+case "$res" in
+  'rc=0 kind=') ok "successful cmd sets no failure kind" ;;
+  *)            bad "successful cmd misreported -> $res" ;;
+esac
+
+printf '\n\033[1m12) every file parses\033[0m\n'
 for f in "$ROOT/declutter" "$ROOT"/lib/*.sh "$ROOT"/modules/*.sh "$ROOT"/tests/*.sh \
          "$ROOT/install.sh" "$ROOT"/completions/*.bash; do
   if bash -n "$f" 2>/dev/null; then ok "bash -n $(basename "$f")"; else bad "bash -n $(basename "$f")"; fi

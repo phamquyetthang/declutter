@@ -4,6 +4,38 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+
+- **A `cmd` item could hang invisibly.** External commands ran with the
+  terminal's stdin still attached while their output went to `/dev/null`, so
+  anything that asked a question — a confirmation prompt, `sudo` wanting a
+  password — blocked forever with the question discarded. On screen that is
+  indistinguishable from a hang, and it could also silently swallow the
+  keystrokes the user typed next. Commands now read from `/dev/null`, which
+  turns that into an immediate clean failure.
+- **A failing `cmd` item left no evidence.** Its output was discarded, so the log
+  recorded only that the command ran. The exit code and up to 20 lines of the
+  command's own output are now written to `~/.declutter.log`.
+- **A command failure was reported as a permission problem.** Any non-zero exit
+  printed "partly denied by permissions", conflating a failed command with a path
+  that could not be removed. The two are now distinguished: `✗ command failed`
+  versus `✓ (some paths denied)`.
+- **pip's cache was reported as 0 K on macOS**, because only `~/.cache/pip` was
+  listed; macOS uses `~/Library/Caches/pip`. Both are listed now, as they already
+  were for yarn and Poetry. Same for `uv`.
+
+### Changed
+
+- Items that delegate to an external tool now print a `…` before running, so a
+  slow command (`uv cache clean`, `pnpm store prune`, `brew cleanup`) reads as
+  working rather than stuck. Both READMEs gained an FAQ entry explaining why
+  those items can take minutes.
+- Tests: 69 → 74 assertions, adding unit-level coverage of the `cmd` plumbing
+  (stdin isolation, exit-code propagation, failure logging) — the end-to-end runs
+  skip `cmd` items by design, which is why these bugs survived.
+
 ## [1.1.0] — 2026-09-08
 
 ### Added

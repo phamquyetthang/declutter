@@ -1,12 +1,16 @@
 #!/usr/bin/env bash
 register_dev_python() {
   local H="$HOME"
+  # Both cache locations are listed: pip uses ~/.cache/pip on Linux but
+  # ~/Library/Caches/pip on macOS, so listing only the first reported 0K there.
   have pip  && add green pkg-python cmd "pip cache purge" \
-      "$(L "pip wheel cache" "pip wheel cache")" "$H/.cache/pip"
+      "$(L "pip wheel cache" "pip wheel cache")" \
+      "$H/.cache/pip" "$H/Library/Caches/pip"
   have pip3 && ! have pip && add green pkg-python cmd "pip3 cache purge" \
-      "$(L "pip wheel cache" "pip wheel cache")" "$H/.cache/pip"
+      "$(L "pip wheel cache" "pip wheel cache")" \
+      "$H/.cache/pip" "$H/Library/Caches/pip"
   have uv   && add green pkg-python cmd "uv cache clean" \
-      "$(L "uv cache" "uv cache")" "$H/.cache/uv"
+      "$(L "uv cache" "uv cache")" "$H/.cache/uv" "$H/Library/Caches/uv"
   have conda && add yellow pkg-python cmd "conda clean --all -y" \
       "$(L "conda: tarballs + index" "conda: tarball + index")" ""
 

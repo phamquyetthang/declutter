@@ -20,8 +20,20 @@ run_selection() {
     idx="${ORDER[$i]}"
     printf '  %s %8s  %s' "$(lvl_icon "${I_LEVEL[$idx]}")" \
            "$(human "${ROW_KB[$i]}")" "${I_DESC[$idx]}"
-    if run_item "$idx"; then printf '  %s✓%s\n' "$C_G" "$R"; done_n=$((done_n+1))
-    else printf '  %s%s%s\n' "$C_Y" "$T_PARTIAL" "$R"; done_n=$((done_n+1)); failed=$((failed+1)); fi
+    # `cmd` items hand control to an external tool that can take minutes
+    # (`uv cache clean` and `brew cleanup` walk a lot of small files). Print a
+    # marker first, so a slow command reads as "working" rather than "hung".
+    [ "${I_ACTION[$idx]}" = cmd ] && printf '  %s%s%s' "$DIM" "$T_CMD_RUNNING" "$R"
+    if run_item "$idx"; then
+      printf '  %s✓%s\n' "$C_G" "$R"; done_n=$((done_n+1))
+    else
+      if [ "$RUN_FAIL_KIND" = cmd ]; then
+        printf '  %s%s%s\n' "$C_R" "$T_CMD_FAILED" "$R"
+      else
+        printf '  %s%s%s\n' "$C_Y" "$T_PARTIAL" "$R"
+      fi
+      done_n=$((done_n+1)); failed=$((failed+1))
+    fi
   done
   after=$(free_kb)
 

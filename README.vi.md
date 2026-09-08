@@ -183,6 +183,17 @@ trước khi chạy.
 `./install.sh --uninstall`, hoặc xóa tay `~/.local/bin/declutter` và
 `~/.local/share/declutter`.
 
+### Sao nó dừng rất lâu ở một mục?
+
+Mục có dấu `…` là mục giao việc cho công cụ ngoài — `uv cache clean`,
+`pnpm store prune`, `brew cleanup`, `docker builder prune`. Mấy lệnh đó phải đi
+qua và xóa cực nhiều file nhỏ, mà xóa hàng loạt trên APFS thì chậm. Để dễ hình
+dung: `pnpm store prune` mất hơn 25 giây dù store **rỗng**; store 2 GB hay cache
+`uv` 200 MB toàn wheel đã giải nén thì phải tính bằng phút. `declutter` không
+làm nhanh hơn được và cũng không cắt lệnh giữa đường, nên nó in `…` rồi chờ. Nếu
+mục đó báo `✗ lệnh lỗi`, exit code và output lỗi của chính lệnh đó nằm trong
+`~/.declutter.log`.
+
 ### Nó có gửi dữ liệu đi đâu không?
 
 Không. Trong tool không có lệnh gọi mạng nào. Chỉ `install.sh` tải về, và chỉ tải

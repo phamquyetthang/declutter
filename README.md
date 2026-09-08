@@ -190,6 +190,18 @@ Yes, one line in a file under `modules/`. See [Adding a cleanup item](#adding-a-
 `./install.sh --uninstall`, or delete `~/.local/bin/declutter` and
 `~/.local/share/declutter` by hand.
 
+### Why did it pause for a long time on one item?
+
+Items printed with a `…` hand control to an external tool — `uv cache clean`,
+`pnpm store prune`, `brew cleanup`, `docker builder prune`. Those walk and unlink
+a very large number of small files, and mass deletion is slow on APFS in
+particular. For scale: `pnpm store prune` takes over 25 seconds on an *empty*
+store, and a 2 GB store or a 200 MB `uv` cache of unpacked wheels is many
+minutes. `declutter` cannot speed that up and will not kill a command part-way
+through, so it prints the `…` and waits. If the item then reports
+`✗ command failed`, the command's exit code and its own error output are in
+`~/.declutter.log`.
+
 ### Does it phone home?
 
 No. There is no network call anywhere in the tool. `install.sh` is the only thing

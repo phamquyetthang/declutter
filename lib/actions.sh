@@ -14,6 +14,11 @@ run_item() {
   # before assigning any of them) — that runs the wrong item.
   local i act extra p rc
   i="$1"; act="${I_ACTION[$i]}"; extra="${I_EXTRA[$i]}"; rc=0
+  # Why the item failed, for the caller to word the message correctly:
+  # "cmd" = the external command exited non-zero, "paths" = some path could not
+  # be removed. Conflating the two used to report a command failure as
+  # "partly denied by permissions".
+  RUN_FAIL_KIND=""
 
   case "$act" in
     rm)
@@ -67,11 +72,29 @@ run_item() {
     cmd)
       if [ "${DRY_RUN:-0}" = 1 ]; then logline "DRY cmd: $extra"; return 0; fi
       logline "cmd: $extra"
-      eval "$extra" >/dev/null 2>&1 || rc=1
+      local out
+      # stdin comes from /dev/null on purpose. Anything the command decides to
+      # ask — a confirmation prompt, sudo wanting a password — would otherwise
+      # block on the terminal forever with the question swallowed by the output
+      # redirect: the screen just stops at this item's line, which is
+      # indistinguishable from a hang. EOF turns that into a clean failure.
+      #
+      # Output is captured rather than discarded, because when a command fails
+      # this is the only evidence of why. Discarding it made the one failure
+      # worth investigating the one thing impossible to investigate.
+      out=$(eval "$extra" </dev/null 2>&1) || rc=$?
+      [ "$rc" = 0 ] || RUN_FAIL_KIND=cmd
+      if [ "$rc" != 0 ]; then
+        logline "cmd FAILED exit=$rc: $extra"
+        printf '%s\n' "$out" | head -20 | while IFS= read -r _l; do
+          [ -n "$_l" ] && logline "  | $_l"
+        done
+      fi
       ;;
 
     note) return 0 ;;
     *) return 1 ;;
   esac
+  [ "$rc" = 0 ] || [ -n "$RUN_FAIL_KIND" ] || RUN_FAIL_KIND=paths
   return $rc
 }
