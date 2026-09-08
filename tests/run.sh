@@ -22,6 +22,15 @@ export NO_COLOR=1
 export DECLUTTER_SKIP_CMD=1
 
 mkdir -p "$HOME" "$DECLUTTER_TMP_ROOT"
+
+# Chạy declutter, giữ lại output để in ra khi có test fail.
+RUNC=0
+dc() {
+  RUNC=$((RUNC+1))
+  printf '\n### lần chạy %d: declutter %s\n' "$RUNC" "$*" >> "$SB/runs.txt"
+  "$ROOT/declutter" "$@" >> "$SB/runs.txt" 2>&1
+  printf '### exit=%d\n' "$?" >> "$SB/runs.txt"
+}
 mk() { mkdir -p "$(dirname "$1")"; mkdir -p "$1"; head -c "${2:-4096}" /dev/urandom > "$1/blob.bin"; }
 
 # ── rác nên bị xóa ở mức green ──────────────────────────────────────────────
@@ -59,12 +68,12 @@ mk "$DECLUTTER_TMP_ROOT/claude-active"
 touch -t 202001010000 "$DECLUTTER_TMP_ROOT/claude-old"
 
 printf '\n\033[1m1) dry-run không được đụng vào bất cứ thứ gì\033[0m\n'
-"$ROOT/declutter" --yes --dry-run -q >/dev/null 2>&1
+dc --yes --dry-run -q
 check_kept "$HOME/.claude/shell-snapshots" "dry-run giữ nguyên mọi thứ"
 grep -q 'DRY' "$DECLUTTER_LOG" && ok "dry-run có ghi log dự định" || bad "dry-run không ghi log"
 
 printf '\n\033[1m2) chạy thật ở mức green\033[0m\n'
-"$ROOT/declutter" --yes -q >/dev/null 2>&1
+dc --yes -q
 
 check "$HOME/.claude/shell-snapshots"          "xóa shell-snapshots"
 check "$HOME/.claude/statsig"                  "xóa statsig"
@@ -97,7 +106,7 @@ check_kept "$HOME/.m2/repository"              "giữ Maven repo (red)"
 check_kept "$DECLUTTER_TMP_ROOT/claude-active" "giữ phiên claude đang chạy"
 
 printf '\n\033[1m5) mức yellow dọn tiếp phần còn lại\033[0m\n'
-"$ROOT/declutter" --yes -l yellow -q >/dev/null 2>&1
+dc --yes -l yellow -q
 check "$HOME/.config/Code/WebStorage"          "yellow xóa WebStorage"
 check "$HOME/.cache/huggingface/hub"           "yellow xóa HuggingFace"
 check_kept "$HOME/.claude/skills"              "yellow vẫn giữ skills"
@@ -106,15 +115,22 @@ check_kept "$HOME/.ssh"                        "yellow vẫn giữ ~/.ssh"
 
 printf '\n\033[1m6) bộ lọc --only / --skip\033[0m\n'
 mk "$HOME/.codex/cache"; mk "$HOME/.gemini/cache"
-"$ROOT/declutter" --yes --only ai-cli --skip ai-cli -q >/dev/null 2>&1
+dc --yes --only ai-cli --skip ai-cli -q
 check_kept "$HOME/.codex/cache" "--skip thắng --only"
-"$ROOT/declutter" --yes --only pkg-node -q >/dev/null 2>&1
+dc --yes --only pkg-node -q
 check_kept "$HOME/.codex/cache" "--only pkg-node không đụng ai-cli"
 
 printf '\n\033[1m7) cú pháp mọi file\033[0m\n'
 for f in "$ROOT/declutter" "$ROOT"/lib/*.sh "$ROOT"/modules/*.sh "$ROOT"/tests/*.sh; do
   if bash -n "$f" 2>/dev/null; then ok "bash -n $(basename "$f")"; else bad "bash -n $(basename "$f")"; fi
 done
+
+if [ "$FAIL" -gt 0 ]; then
+  printf '\n\033[1m--- output của declutter trong các lần chạy ---\033[0m\n'
+  cat "$SB/runs.txt" 2>/dev/null
+  printf '\n\033[1m--- môi trường ---\033[0m\n'
+  printf 'HOME=%s\nbash=%s\nuname=%s\n' "$HOME" "$BASH_VERSION" "$(uname -sm)"
+fi
 
 printf '\n\033[1mKết quả: %d pass, %d fail\033[0m\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]
