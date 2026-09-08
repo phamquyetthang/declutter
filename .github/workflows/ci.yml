@@ -14,6 +14,17 @@ jobs:
       - name: Phiên bản bash
         run: bash --version | head -1; /bin/bash --version | head -1
 
+      - name: Bit thực thi phải còn nguyên sau khi clone
+        run: |
+          for f in declutter install.sh tests/run.sh; do
+            if [ ! -x "$f" ]; then
+              echo "::error::$f không có quyền thực thi sau khi clone."
+              echo "Sửa: git update-index --chmod=+x $f"
+              exit 1
+            fi
+          done
+          echo "OK: declutter, install.sh, tests/run.sh đều executable"
+
       - name: Kiểm tra cú pháp
         run: |
           for f in declutter lib/*.sh modules/*.sh tests/*.sh install.sh; do
@@ -22,44 +33,6 @@ jobs:
 
       # macOS ship bash 3.2 ở /bin/bash — chạy test bằng đúng bản đó để chắc
       # không lỡ dùng cú pháp bash 4+ (declare -A, mapfile, ${var,,}…)
-      - name: Debug — danh sách có được dựng không
-        run: |
-          SB=$(mktemp -d)
-          export HOME="$SB/home" DECLUTTER_TMP_ROOT="$SB/tmp" \
-                 DECLUTTER_LOG="$SB/log" DECLUTTER_SKIP_CMD=1 NO_COLOR=1
-          mkdir -p "$HOME/.claude/shell-snapshots" "$HOME/.config/Code/Cache" "$SB/tmp"
-          head -c 200000 /dev/urandom > "$HOME/.claude/shell-snapshots/blob.bin"
-          head -c 200000 /dev/urandom > "$HOME/.config/Code/Cache/blob.bin"
-          echo "--- declare -F register_* ---"
-          /bin/bash -c '. lib/core.sh; . lib/registry.sh;
-            DECLUTTER_ROOT=$PWD; for m in modules/*.sh; do . "$m"; done;
-            declare -F | awk "{print \$3}" | grep "^register_"'
-          echo "--- add() có thêm mục không ---"
-          /bin/bash -c '. lib/core.sh; . lib/registry.sh; . lib/ui.sh;
-            DECLUTTER_ROOT=$PWD; register_all; echo "items=${#I_LEVEL[@]}";
-            build_order; echo "order=${#ORDER[@]}"'
-          echo "--- sort -k1,1n -k2,2rn ---"
-          printf '2\t000000000010\t1\t10\n1\t000000000020\t0\t20\n' | sort -k1,1n -k2,2rn || echo "SORT LỖI"
-          echo "--- mktemp không tham số ---"
-          mktemp && echo "mktemp ok" || echo "mktemp CẦN template"
-          echo "--- report ---"
-          /bin/bash ./declutter --report || true
-          echo "--- chạy THẬT với trace ---"
-          set +e
-          /bin/bash -x ./declutter --yes > "$SB/out.txt" 2> "$SB/trace.txt"
-          echo "exit=$?"
-          echo "--- stdout ---"; cat "$SB/out.txt"
-          echo "--- 60 dòng trace cuối ---"; tail -60 "$SB/trace.txt"
-          echo "--- còn lại trên đĩa ---"
-          ls -la "$HOME/.claude/" "$HOME/.config/Code/" 2>&1
-          echo "--- log ---"; cat "$DECLUTTER_LOG" 2>&1 || echo "(không có log)"
-          echo "--- fixture 4096 byte đo được bao nhiêu? ---"
-          F="$SB/fixture"; mkdir -p "$F"
-          head -c 4096 /dev/urandom > "$F/blob.bin"
-          echo "kích thước file: $(wc -c < "$F/blob.bin") byte"
-          echo "du -sk thư mục: $(du -sk "$F")"
-          echo "du -sk file:    $(du -sk "$F/blob.bin")"
-
       - name: Test (bash hệ thống)
         run: /bin/bash tests/run.sh
 
