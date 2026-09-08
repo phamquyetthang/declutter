@@ -53,6 +53,12 @@ jobs:
           echo "--- còn lại trên đĩa ---"
           ls -la "$HOME/.claude/" "$HOME/.config/Code/" 2>&1
           echo "--- log ---"; cat "$DECLUTTER_LOG" 2>&1 || echo "(không có log)"
+          echo "--- fixture 4096 byte đo được bao nhiêu? ---"
+          F="$SB/fixture"; mkdir -p "$F"
+          head -c 4096 /dev/urandom > "$F/blob.bin"
+          echo "kích thước file: $(wc -c < "$F/blob.bin") byte"
+          echo "du -sk thư mục: $(du -sk "$F")"
+          echo "du -sk file:    $(du -sk "$F/blob.bin")"
 
       - name: Test (bash hệ thống)
         run: /bin/bash tests/run.sh
