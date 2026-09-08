@@ -28,9 +28,16 @@ o = an toàn (tick sẵn)   ! = cân nhắc   x = tự quyết, không chọn đ
 
 ## Cài đặt
 
+Cùng một lệnh cho cả Linux và macOS:
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/phamquyetthang/declutter/main/install.sh | bash
 ```
+
+Cài vào `~/.local/bin` (đổi bằng `PREFIX=...`). Nếu máy chưa có `git` — hay gặp
+trên Mac mới vì cần Xcode Command Line Tools — installer tự chuyển sang tải
+tarball bằng `curl`. Cài xong nó tự báo dòng `export PATH=...` cần thêm vào đúng
+file rc của shell bạn đang dùng (`~/.zshrc` cho macOS, `~/.bashrc` cho Linux).
 
 Hoặc clone rồi chạy trực tiếp — không cần cài:
 

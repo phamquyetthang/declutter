@@ -37,31 +37,44 @@ size_kb() {
   printf '%s' "$total"
 }
 
+# KB -> chuỗi người đọc được. Viết thuần bash, KHÔNG gọi awk:
+#  - awk in "1,3G" theo locale vi_VN (phải ép LC_NUMERIC=C mới đúng)
+#  - và mỗi lời gọi là một process; hàm này chạy trong vòng vẽ nên phải rẻ.
 human() {
-  # LC_NUMERIC=C để luôn ra "1.3G" chứ không thành "1,3G" theo locale vi_VN
-  LC_NUMERIC=C awk -v k="$1" 'BEGIN{
-    if (k>=1048576) printf "%.1fG", k/1048576;
-    else if (k>=1024)  printf "%.0fM", k/1024;
-    else               printf "%dK", k;
-  }'
+  local k="$1" t
+  case "$k" in ''|*[!0-9]*) k=0 ;; esac
+  if [ "$k" -ge 1048576 ]; then
+    t=$(( (k * 10 + 524288) / 1048576 ))      # phần mười GB, làm tròn
+    printf '%s.%sG' "$((t / 10))" "$((t % 10))"
+  elif [ "$k" -ge 1024 ]; then
+    printf '%sM' "$(( (k + 512) / 1024 ))"
+  else
+    printf '%sK' "$k"
+  fi
 }
 
 # Cắt/đệm chuỗi theo KÝ TỰ chứ không theo byte — printf "%-46.46s" sẽ cắt
 # giữa một ký tự UTF-8 và làm vỡ tiếng Việt.
-# Căn phải theo ký tự (dùng cho cột dung lượng — "—" là 3 byte nhưng 1 ký tự)
+# pad/padl đặt kết quả vào $PAD_OUT thay vì in ra stdout.
+# Lý do: vòng vẽ gọi chúng cho từng dòng, mỗi lần bấm phím. Dùng $(pad …) sẽ
+# fork một subshell cho mỗi ô → hàng chục process mỗi frame → giật và nháy.
+PAD_OUT=""
+
+# Căn phải theo ký tự ("—" là 3 byte nhưng 1 ký tự nên %8s của printf sai)
 padl() {
   local s="$1" w="$2" n
   n=${#s}          # phải tách dòng: bash expand hết đối số của `local` TRƯỚC khi gán
-  while [ "$n" -lt "$w" ]; do printf ' '; n=$((n+1)); done
-  printf '%s' "$s"
+  while [ "$n" -lt "$w" ]; do s=" $s"; n=$((n+1)); done
+  PAD_OUT="$s"
 }
 
+# Căn trái + cắt theo ký tự
 pad() {
   local s="$1" w="$2" n
   n=${#s}
   if [ "$n" -gt "$w" ]; then s="${s:0:$((w-1))}…"; n="$w"; fi
-  printf '%s' "$s"
-  while [ "$n" -lt "$w" ]; do printf ' '; n=$((n+1)); done
+  while [ "$n" -lt "$w" ]; do s="$s "; n=$((n+1)); done
+  PAD_OUT="$s"
 }
 
 free_kb() { df -k / 2>/dev/null | awk 'NR==2{print $4}'; }

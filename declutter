@@ -140,9 +140,7 @@ if [ ! -t 0 ] || [ ! -t 1 ]; then
 fi
 
 if pick_interactive; then
-  printf '\033[?25h'
   run_selection
 else
-  printf '\033[?25h'
   say "Đã thoát, không xóa gì."
 fi

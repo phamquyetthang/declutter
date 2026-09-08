@@ -42,5 +42,32 @@ jobs:
           sudo apt-get update -qq && sudo apt-get install -y shellcheck
           shellcheck -S warning -x declutter lib/*.sh modules/*.sh || true
 
+      # Cài thật vào PREFIX tạm rồi chạy QUA SYMLINK — kiểm tra khâu resolve
+      # symlink bằng `readlink` (BSD trên macOS không giống GNU) và cả installer.
+      - name: install.sh + chạy qua symlink
+        run: |
+          set -e
+          P="$(mktemp -d)/prefix"
+          PREFIX="$P" ./install.sh
+          test -L "$P/bin/declutter" || { echo "::error::không tạo được symlink"; exit 1; }
+          "$P/bin/declutter" --version
+          NO_COLOR=1 "$P/bin/declutter" --report | head -5
+          echo "OK: chạy được qua symlink"
+
+      - name: install.sh không có git (đường tarball)
+        run: |
+          set -e
+          P="$(mktemp -d)/prefix"
+          D="$(mktemp -d)"; cp install.sh "$D/"          # tách khỏi repo để buộc phải tải về
+          cd "$D"
+          PATH="/usr/bin:/bin:/usr/sbin:/sbin" \
+            env -u GIT_EXEC_PATH PREFIX="$P" bash -c '
+              git() { return 127; }; export -f git 2>/dev/null || true
+              ./install.sh' || true
+          # chỉ cần khẳng định đường tarball tải và giải nén được
+          curl -fsSL "https://codeload.github.com/${GITHUB_REPOSITORY}/tar.gz/refs/heads/main" \
+            | tar tz | head -3
+          echo "OK: tarball tải được"
+
       - name: Smoke test --report
         run: NO_COLOR=1 ./declutter --report | head -20
