@@ -1,138 +1,144 @@
-# Dọn dẹp bộ nhớ và data rác — Ubuntu & macOS
+# Disk cleanup reference for developers — Ubuntu & macOS
 
-Tài liệu tổng hợp lệnh terminal để **tìm ra chỗ đang ngốn dung lượng** rồi giải phóng
-nó: **rác của các công cụ AI** (transcript, cache IDE, model weights), cache hệ thống,
-cache của package manager, môi trường dev (Node/Python/Rust/Go/Java/Docker) và các thư
-mục rác đặc thù của từng OS.
+[English](GUIDE.md) · [Tiếng Việt](GUIDE.vi.md)
 
-Phần AI được đặt **đầu tiên (§A)** vì đó là nhóm phình nhanh nhất hiện nay và không
-công cụ dọn dẹp nào của OS đụng tới nó.
+Every terminal command worth knowing to **find out what is eating your disk** and
+then reclaim it: **AI tool junk** (transcripts, IDE caches, model weights), system
+caches, package manager caches, dev environments (Node/Python/Rust/Go/Java/Docker)
+and the OS-specific junk directories.
 
-> **Quy tắc vàng:** *đo trước, xóa sau.* Chạy phần **§0 Chẩn đoán** trước để biết GB
-> đang nằm ở đâu — xóa mù thường chỉ thu lại vài trăm MB trong khi thủ phạm thật là
-> một thư mục `node_modules` / `DerivedData` / Docker volume nặng 40 GB.
+The AI section comes **first (§A)** because it is the fastest-growing group today
+and no OS cleanup tool touches it.
 
-**Chú thích mức độ an toàn dùng xuyên suốt tài liệu:**
+> **The golden rule:** *measure first, delete second.* Run **§0 Diagnostics**
+> before anything else, so you know where the gigabytes actually are. Deleting
+> blindly usually reclaims a few hundred megabytes while the real culprit is one
+> 40 GB `node_modules` / `DerivedData` / Docker volume.
 
-| Nhãn | Ý nghĩa |
+**The safety labels used throughout this document:**
+
+| Label | Meaning |
 |---|---|
-| 🟢 An toàn | Chỉ xóa cache tái tạo được. Chạy thoải mái. |
-| 🟡 Cân nhắc | Mất cache khiến lần build/cài kế tiếp chậm, hoặc phải đăng nhập lại. |
-| 🔴 Cẩn thận | Có thể mất dữ liệu thật / cần đóng app trước / không hoàn tác được. |
+| 🟢 Safe | Deletes regenerable cache only. Run it freely. |
+| 🟡 Your call | Losing the cache makes the next build or install slow, or logs you out of something. |
+| 🔴 Careful | May lose real data / needs the app closed / cannot be undone. |
 
-**Quy ước:** *mọi* lệnh có thao tác xóa đều mang nhãn — hoặc ở đầu gạch đầu dòng,
-hoặc dưới dạng comment ngay cuối dòng trong code block. Lệnh **không có nhãn xóa**
-là lệnh **chỉ đọc** (`du`, `df`, `find … -print`, `ls`, `*list`) — chạy được vô tư.
-Khi một lệnh vừa đo vừa xóa, nhãn luôn theo vế xóa.
+**Convention:** *every* command that deletes something carries a label — either at
+the start of the bullet, or as a comment at the end of the line inside a code
+block. A command with **no delete label** is **read-only** (`du`, `df`,
+`find … -print`, `ls`, `*list`) and safe to run. When a command both measures and
+deletes, the label describes the deleting half.
 
 ---
 
-## ⚠️ Người dùng macOS đọc trước: zsh khác bash ở chỗ glob
+## ⚠️ macOS users read this first: zsh globs differ from bash
 
-macOS mặc định dùng **zsh**. Khi một mẫu `*` **không khớp file nào**, zsh **báo lỗi
-và hủy luôn cả lệnh**, trong khi bash chỉ giữ nguyên chuỗi rồi chạy tiếp:
+macOS defaults to **zsh**. When a `*` pattern **matches nothing**, zsh **errors
+out and cancels the whole command**, where bash keeps the literal string and
+carries on:
 
 ```
 zsh: no matches found: /Users/thang/.aider*
 ```
 
-Nghĩa là chỉ cần **một** đường dẫn không tồn tại là cả vòng lặp không chạy dòng nào —
-kể cả khi bạn đã có `2>/dev/null`, vì lỗi xảy ra lúc zsh khai triển glob, **trước
-khi** lệnh được gọi, nên redirect không đỡ được.
+That means **one** missing path stops the entire loop from running a single line —
+even with `2>/dev/null`, because the failure happens while zsh expands the glob,
+**before** the command is invoked, so the redirect cannot help.
 
-Các lệnh **xóa** trong tài liệu này đã được viết lại cho **không còn glob** (dùng
-`find … -exec` thay cho `rm -rf thư-mục/*`) để chạy đúng trên cả hai shell. Một số
-lệnh **liệt kê** vẫn cần `*` (ví dụ `du -sh ~/.claude/*`). Nếu gặp `no matches found`:
+Every **deleting** command in this document has been rewritten to be **glob-free**
+(`find … -exec` instead of `rm -rf dir/*`) so it behaves identically in both
+shells. Some **listing** commands still need `*` (e.g. `du -sh ~/.claude/*`). If
+you hit `no matches found`:
 
 ```bash
-setopt +o nomatch     # 🟢 chỉ đổi hành vi shell, tự mất khi đóng terminal
+setopt +o nomatch     # 🟢 shell behaviour only, gone when you close the terminal
 ```
 
-Muốn tắt vĩnh viễn thì thêm `unsetopt nomatch` vào `~/.zshrc`. Xem shell đang dùng:
-`echo $SHELL`.
+To disable it permanently, add `unsetopt nomatch` to `~/.zshrc`. To check which
+shell you are in: `echo $SHELL`.
 
-Các khác biệt macOS (BSD) ↔ Ubuntu (GNU) khác đã được xử lý sẵn trong tài liệu:
-`du` không có `--max-depth` (dùng `-d`), `find` không có `-printf`, `find` không có
-`-mindepth`… vẫn có. Riêng `sort -rh` thì **cả hai đều hỗ trợ**, dùng bình thường.
+The other macOS (BSD) ↔ Ubuntu (GNU) differences are already handled below: `du`
+has no `--max-depth` (use `-d`), `find` has no `-printf`, `find` does have
+`-mindepth`. `sort -rh` works on **both**, so it is used freely.
 
 ---
 
-## §0. Chẩn đoán: dung lượng đang nằm ở đâu?
+## §0. Diagnostics: where is the space?
 
-> 🟢 **Toàn bộ §0 là chỉ đọc** — không lệnh nào trong phần này xóa bất cứ thứ gì.
-> Ngoại lệ duy nhất: trong `ncdu` bạn có thể bấm phím `d` để xóa — đó là thao tác
-> tay của bạn, và nó là 🔴 (xóa ngay, không qua thùng rác).
+> 🟢 **All of §0 is read-only** — nothing in this section deletes anything. The
+> single exception: inside `ncdu` you can press `d` to delete — that is your own
+> keystroke, and it is 🔴 (immediate, no trash).
 
-### 0.1 Tổng quan ổ đĩa (cả 2 OS)
+### 0.1 Disk overview (both OSes)
 
 ```bash
-df -h            # dung lượng còn trống theo từng phân vùng
-df -h /          # chỉ ổ hệ thống
+df -h            # free space per partition
+df -h /          # the system volume only
 ```
 
-### 0.2 Thư mục nào nặng nhất
+### 0.2 Which directories are heaviest
 
 ```bash
-# Top 20 thư mục nặng nhất trong thư mục hiện tại
+# Top 20 heaviest directories here
 du -sh -- * .[!.]* 2>/dev/null | sort -rh | head -20
 
-# Quét cả home directory
+# Scan the whole home directory
 du -sh ~/* ~/.[!.]* 2>/dev/null | sort -rh | head -25
 ```
 
-Ubuntu — quét toàn hệ thống (`-x` = không đi sang phân vùng khác):
+Ubuntu — whole-system scan (`-x` = do not cross filesystems):
 
 ```bash
 sudo du -xh / --max-depth=1 2>/dev/null | sort -rh | head -20
 ```
 
-macOS — `du` bản BSD không có `--max-depth`, dùng `-d`:
+macOS — BSD `du` has no `--max-depth`, use `-d`:
 
 ```bash
 sudo du -xh -d 1 / 2>/dev/null | sort -rh | head -20
 sudo du -xh -d 1 ~/Library 2>/dev/null | sort -rh | head -20
 ```
 
-### 0.3 Công cụ tương tác (khuyên dùng — nhanh hơn `du` nhiều)
+### 0.3 Interactive tools (recommended — far faster than `du`)
 
 ```bash
 # Ubuntu
 sudo apt install ncdu
-ncdu -x /                       # duyệt cây thư mục, bấm 'd' để xóa
+ncdu -x /                       # browse the tree, press 'd' to delete
 
 # macOS
 brew install ncdu
-ncdu -x /                       # hoặc: brew install dust && dust -d 2 ~
+ncdu -x /                       # or: brew install dust && dust -d 2 ~
 ```
 
-Bản GUI: Ubuntu có **Disk Usage Analyzer** (`baobab`), macOS có
- *Apple  → About This Mac → Storage → Manage* hoặc app **GrandPerspective**.
+GUI options: Ubuntu has **Disk Usage Analyzer** (`baobab`); macOS has
+* → About This Mac → Storage → Manage*, or the **GrandPerspective** app.
 
-### 0.4 Tìm file lớn riêng lẻ
+### 0.4 Finding individual large files
 
 ```bash
-# File > 500 MB trong home
+# Files > 500 MB in home
 find ~ -type f -size +500M -exec ls -lh {} \; 2>/dev/null | awk '{print $5, $9}'
 
-# 20 file lớn nhất toàn máy (Ubuntu)
+# The 20 largest files on the machine (Ubuntu)
 sudo find / -xdev -type f -printf '%s %p\n' 2>/dev/null | sort -rn | head -20
 
-# macOS (find BSD không có -printf)
+# macOS (BSD find has no -printf)
 sudo find / -xdev -type f -size +500M 2>/dev/null -exec ls -lh {} + | awk '{print $5, $9}'
 ```
 
 ---
 
-# PHẦN A — CÔNG CỤ AI (dọn trước tiên)
+# PART A — AI TOOLS (clean these first)
 
-Đây là nhóm rác **mới nhất và phình nhanh nhất** trên máy dev, nhưng gần như không
-có công cụ dọn dẹp nào của hệ điều hành đụng tới: transcript hội thoại, cache
-webview của IDE, extension VSIX đã tải, và **model weights hàng chục GB**.
+This is the **newest and fastest-growing** junk on a dev machine, and almost no OS
+cleanup tool touches it: conversation transcripts, IDE webview caches, downloaded
+extension VSIXs, and **model weights measured in tens of gigabytes**.
 
-**Lệnh đo 1 phát — chạy cái này trước:**
+**One command to measure it all — run this first:**
 
 ```bash
-# 🟢 chỉ đọc. Không dùng glob nào → chạy đúng trên cả bash lẫn zsh (macOS).
+# 🟢 read-only. No globs at all → correct in both bash and zsh (macOS).
 for p in ~/.claude ~/.codex ~/.gemini ~/.cursor ~/.windsurf ~/.continue \
          ~/.aider.tags.cache.v3 ~/.aider.chat.history.md \
          ~/.ollama ~/.lmstudio ~/.copilot ~/.anthropic \
@@ -148,55 +154,57 @@ for p in ~/.claude ~/.codex ~/.gemini ~/.cursor ~/.windsurf ~/.continue \
 done | sort -rh
 ```
 
-> Số liệu thật đo trên một máy dev Ubuntu đang dùng nhiều công cụ AI (để bạn hình
-> dung độ lớn): `~/.config/Code` **5.0 G**, `~/.vscode/extensions` **1.6 G**,
+> Real numbers from one Ubuntu dev machine with heavy AI tool use, to give you a
+> sense of scale: `~/.config/Code` **5.0 G**, `~/.vscode/extensions` **1.6 G**,
 > `~/.cursor` **638 M**, `~/.claude` **369 M**, `~/.codex` **150 M**,
-> `~/.gemini` **104 M** — tổng hơn **7 GB** mà `apt clean` không chạm được dòng nào.
+> `~/.gemini` **104 M** — over **7 GB** that `apt clean` cannot touch a byte of.
 
 ---
 
-## A1. Trợ lý code chạy trong terminal (Claude Code, Codex, Gemini CLI, Aider)
+## A1. Terminal coding assistants (Claude Code, Codex, Gemini CLI, Aider)
 
-Rác chính là **transcript hội thoại** (JSONL/SQLite) tích lũy theo từng project.
+The bulk of it is **conversation transcripts** (JSONL/SQLite) accumulating per
+project.
 
-**Claude Code** — xem cái gì đang nặng:
+**Claude Code** — see what is heavy:
 
 ```bash
 du -sh ~/.claude/* 2>/dev/null | sort -rh | head
 ```
 
-Thường thấy: `projects/` (transcript, nặng nhất), `plugins/`, `file-history/`,
-`shell-snapshots/`, `todos/`, `statsig/`, `backups/`.
+You will usually see: `projects/` (transcripts, the heaviest), `plugins/`,
+`file-history/`, `shell-snapshots/`, `todos/`, `statsig/`, `backups/`.
 
-* 🟡 **Xóa transcript cũ hơn 30 ngày** — đánh đổi: không `--resume`/`--continue`
-  lại được các session đó nữa:
+* 🟡 **Delete transcripts older than 30 days** — the trade-off: you can no longer
+  `--resume`/`--continue` those sessions:
     ```bash
-    du -sh ~/.claude/projects/* 2>/dev/null | sort -rh | head      # xem trước
-    find ~/.claude/projects -name '*.jsonl' -mtime +30 -print      # kiểm tra danh sách
-    # đồng ý rồi mới đổi -print thành -delete
+    du -sh ~/.claude/projects/* 2>/dev/null | sort -rh | head      # look first
+    find ~/.claude/projects -name '*.jsonl' -mtime +30 -print      # check the list
+    # only once you agree, change -print to -delete
     ```
-* 🟢 **Rác chắc chắn tái tạo được:**
+* 🟢 **Junk that provably regenerates:**
     ```bash
-    # không glob → chạy được trên zsh; các thư mục này tự tạo lại ở lần chạy sau
+    # glob-free → works in zsh; these directories rebuild themselves on next run
     rm -rf ~/.claude/shell-snapshots ~/.claude/statsig ~/.cache/claude-cli-nodejs
     find /tmp -maxdepth 1 -name 'claude-*' -exec rm -rf {} + 2>/dev/null
     ```
-* 🟡 **Lịch sử sửa file & backup** (dùng để undo các thay đổi cũ):
+* 🟡 **File-edit history & backups** (used to undo older changes):
     ```bash
     du -sh ~/.claude/file-history ~/.claude/backups
     find ~/.claude/file-history -mtime +30 -delete
     ```
-* 🔴 **Đừng xóa**: `~/.claude/settings.json`, `~/.claude.json`, `~/.claude/CLAUDE.md`,
-  `~/.claude/skills`, `~/.claude/agents`, `~/.claude/memory` — là cấu hình và bộ nhớ
-  bạn tự viết, không tái tạo được.
+* 🔴 **Do not delete**: `~/.claude/settings.json`, `~/.claude.json`,
+  `~/.claude/CLAUDE.md`, `~/.claude/skills`, `~/.claude/agents`,
+  `~/.claude/memory` — configuration and memory you wrote yourself, not
+  regenerable.
 
 **Codex CLI:**
 
 ```bash
 du -sh ~/.codex/* 2>/dev/null | sort -rh
 rm -rf ~/.codex/cache                                  # 🟢
-find ~/.codex/sessions -mtime +30 -delete              # 🟡 mất lịch sử session
-ls -lh ~/.codex/logs*.sqlite                           # 🟡 file log có thể vài chục MB
+find ~/.codex/sessions -mtime +30 -delete              # 🟡 loses session history
+ls -lh ~/.codex/logs*.sqlite                           # 🟡 log files can be tens of MB
 ```
 
 **Gemini CLI / Antigravity:**
@@ -206,100 +214,103 @@ du -sh ~/.gemini/* 2>/dev/null | sort -rh
 rm -rf ~/.gemini/tmp ~/.gemini/cache 2>/dev/null       # 🟢
 ```
 
-**Aider** — rác nằm **trong từng repo**, không phải ở home:
+**Aider** — its junk lives **inside each repo**, not in home:
 
 ```bash
-# 🟢 chỉ đọc — tìm cache và lịch sử chat của Aider nằm rải trong các repo
+# 🟢 read-only — find Aider caches and chat history scattered across repos
 find ~ -name '.aider.tags.cache.v*' -type d -prune 2>/dev/null \
   | xargs -I{} du -sh {} 2>/dev/null | sort -rh | head
 find ~ \( -name '.aider.chat.history.md' -o -name '.aider.input.history' \) 2>/dev/null
 
-# 🟢 cache tags — Aider tự dựng lại ở lần chạy sau
+# 🟢 tags cache — Aider rebuilds it on the next run
 find ~ -name '.aider.tags.cache.v*' -type d -prune -exec rm -rf {} + 2>/dev/null
-# 🔴 lịch sử chat là dữ liệu bạn tạo ra — xem trước rồi mới xóa từng file
+# 🔴 chat history is data you produced — review it, then delete file by file
 ```
 
-**Nguyên tắc chung cho nhóm này:** transcript là dữ liệu **bạn** tạo ra. Nếu có
-đoạn hội thoại quan trọng, export/copy ra trước khi xóa hàng loạt.
+**The rule for this whole group:** transcripts are data **you** created. If a
+conversation matters, export or copy it before any bulk delete.
 
-## A2. IDE có AI (VS Code + Copilot, Cursor, Windsurf)
+## A2. AI-enabled IDEs (VS Code + Copilot, Cursor, Windsurf)
 
-Đây thường là **thư mục nặng nhất trong home** của một máy dev — chủ yếu do webview
-storage của các panel chat AI và extension đã tải về.
+This is usually the **heaviest directory in a dev machine's home** — mostly the
+webview storage of AI chat panels plus downloaded extensions.
 
-Đường dẫn theo OS:
+Paths per OS:
 
-| Thành phần | Ubuntu | macOS |
+| Component | Ubuntu | macOS |
 |---|---|---|
 | VS Code | `~/.config/Code` | `~/Library/Application Support/Code` |
 | Cursor | `~/.config/Cursor` | `~/Library/Application Support/Cursor` |
 | Windsurf | `~/.config/Windsurf` | `~/Library/Application Support/Windsurf` |
-| Extensions | `~/.vscode/extensions`, `~/.cursor/extensions` | giống Ubuntu (nằm ở `~`) |
+| Extensions | `~/.vscode/extensions`, `~/.cursor/extensions` | same as Ubuntu (they live in `~`) |
 
-**Đóng IDE trước khi chạy các lệnh dưới đây.**
+**Quit the IDE before running any of the commands below.**
 
 ```bash
 BASE=~/.config/Code          # macOS: BASE=~/Library/Application\ Support/Code
 du -sh "$BASE"/* 2>/dev/null | sort -rh | head -8
 ```
 
-* 🟢 **Cache thuần — xóa thoải mái:**
+* 🟢 **Pure cache — delete freely:**
     ```bash
     rm -rf "$BASE"/Cache "$BASE"/CachedData "$BASE"/CachedExtensionVSIXs \
            "$BASE"/Code\ Cache "$BASE"/GPUCache "$BASE"/logs
     ```
-    `CachedExtensionVSIXs` là các file `.vsix` đã tải để cài extension — cài xong là
-    vô dụng (trên máy đo được: **654 MB**).
-* 🟡 **`WebStorage` — thủ phạm lớn nhất, chính là storage của các webview AI chat**
-  (đo được **3.1 GB**). Xóa sẽ mất state hiển thị của một số panel, không mất code:
+    `CachedExtensionVSIXs` holds the `.vsix` files downloaded to install
+    extensions — useless once installed (**654 MB** on the measured machine).
+* 🟡 **`WebStorage` — the single biggest offender, the storage behind the AI chat
+  webviews** (**3.1 GB** measured). Deleting it loses the display state of some
+  panels; it never touches code:
     ```bash
     du -sh "$BASE"/WebStorage
     rm -rf "$BASE"/WebStorage
     ```
-* 🟡 **`User/globalStorage` — dữ liệu extension, trong đó có lịch sử Copilot Chat:**
+* 🟡 **`User/globalStorage` — extension data, including Copilot Chat history:**
     ```bash
     du -sh "$BASE"/User/globalStorage/* 2>/dev/null | sort -rh | head
-    rm -rf "$BASE"/User/globalStorage/github.copilot-chat     # mất lịch sử chat Copilot
+    rm -rf "$BASE"/User/globalStorage/github.copilot-chat     # loses Copilot chat history
     ```
-* 🟡 **`User/workspaceStorage` — state riêng cho từng thư mục đã từng mở** (đo được
-  **241 MB**). Rất nhiều mục trỏ tới project đã xóa từ lâu:
+* 🟡 **`User/workspaceStorage` — per-folder state for everything you ever opened**
+  (**241 MB** measured). Most entries point at projects deleted long ago:
     ```bash
     du -sh "$BASE"/User/workspaceStorage | tail -1
-    find "$BASE"/User/workspaceStorage -maxdepth 1 -mtime +180 -print   # kiểm tra trước
+    find "$BASE"/User/workspaceStorage -maxdepth 1 -mtime +180 -print   # check first
     ```
-* 🟡 **Extensions — gỡ cái không dùng thay vì xóa cả thư mục:**
+* 🟡 **Extensions — uninstall what you don't use instead of nuking the folder:**
     ```bash
     du -sh ~/.vscode/extensions/* 2>/dev/null | sort -rh | head -15
     code --list-extensions
     code --uninstall-extension <publisher.name>
     ```
-    Xóa trắng `~/.vscode/extensions` cũng được (🟡) — VS Code sẽ cài lại nếu bạn
-    bật Settings Sync, nhưng phải tải lại toàn bộ.
-* 🔴 **Đừng xóa**: `User/settings.json`, `User/keybindings.json`, `User/snippets`,
-  `User/History` (là bản local history của file bạn sửa — có thể cứu code).
+    Wiping `~/.vscode/extensions` outright also works (🟡) — VS Code reinstalls
+    them if you have Settings Sync on, but everything has to download again.
+* 🔴 **Do not delete**: `User/settings.json`, `User/keybindings.json`,
+  `User/snippets`, `User/History` (the local history of files you edited — it can
+  save uncommitted code).
 
-Cursor/Windsurf có thêm thư mục riêng ở home:
+Cursor/Windsurf add their own directories in home:
 
 ```bash
 du -sh ~/.cursor/* 2>/dev/null | sort -rh          # extensions, projects, ai-tracking…
-rm -rf ~/.cursor/ai-tracking 2>/dev/null           # 🟢 telemetry cục bộ
+rm -rf ~/.cursor/ai-tracking 2>/dev/null           # 🟢 local telemetry
 ```
 
-## A3. Model chạy local (Ollama, LM Studio, llama.cpp, GGUF)
+## A3. Local models (Ollama, LM Studio, llama.cpp, GGUF)
 
-Nhóm này **không tính bằng MB mà bằng chục GB**. Nếu bạn có cài, đây gần như chắc
-chắn là thứ nặng nhất trong toàn bộ tài liệu này.
+This group is measured **in tens of gigabytes, not megabytes**. If you have it
+installed, it is almost certainly the heaviest thing in this entire document.
 
 **Ollama:**
 
 ```bash
-ollama list                                   # xem model + dung lượng
-du -sh ~/.ollama/models 2>/dev/null           # macOS: ~/.ollama/models cũng vậy
-ollama rm llama3:70b                          # 🔴 xóa hẳn, muốn dùng lại phải pull ~40GB
-ollama ps                                     # model nào đang nạp trong RAM
+ollama list                                   # models and their sizes
+du -sh ~/.ollama/models 2>/dev/null           # macOS: same path
+ollama rm llama3:70b                          # 🔴 gone; getting it back is a ~40GB pull
+ollama ps                                     # which models are loaded in RAM
 ```
-Nếu chạy Ollama bằng Docker, model nằm trong volume: `docker volume ls | grep ollama`
-rồi `docker volume rm <tên>` (🔴).
+
+If you run Ollama in Docker, the models live in a volume:
+`docker volume ls | grep ollama`, then `docker volume rm <name>` (🔴).
 
 **LM Studio:**
 
@@ -308,67 +319,68 @@ du -sh ~/.lmstudio/models ~/.cache/lm-studio 2>/dev/null
 # macOS: ~/.lmstudio, ~/Library/Application Support/LM Studio
 ```
 
-**File GGUF/safetensors rải rác** (tải tay, để quên trong Downloads):
+**Stray GGUF/safetensors files** (downloaded by hand, forgotten in Downloads):
 
 ```bash
 find ~ -type f \( -name '*.gguf' -o -name '*.safetensors' -o -name '*.ckpt' -o -name '*.pt' \) \
   -size +200M 2>/dev/null -exec ls -lh {} + | awk '{print $5, $9}' | sort -rh
 ```
 
-## A4. Cache thư viện ML (HuggingFace, PyTorch, MediaPipe, Whisper, CUDA)
+## A4. ML library caches (HuggingFace, PyTorch, MediaPipe, Whisper, CUDA)
 
-Model tải tự động khi chạy code — dễ quên vì không ai chủ động tải chúng.
+Models downloaded automatically when code runs — easy to forget, because nobody
+deliberately downloaded them.
 
 ```bash
 du -sh ~/.cache/huggingface ~/.cache/torch ~/.cache/whisper \
        ~/.keras ~/.cache/clip ~/.triton ~/.nv 2>/dev/null | sort -rh
 ```
 
-* 🟡 **HuggingFace** — có công cụ xóa chọn lọc, tốt hơn `rm -rf`:
+* 🟡 **HuggingFace** — it ships a selective deletion tool, better than `rm -rf`:
     ```bash
-    huggingface-cli scan-cache          # bảng model + dung lượng + lần dùng cuối
-    huggingface-cli delete-cache        # chọn revision để xóa (giao diện tương tác)
-    # hoặc thẳng tay:
+    huggingface-cli scan-cache          # table of models, sizes, last use
+    huggingface-cli delete-cache        # pick revisions to drop (interactive)
+    # or bluntly:
     rm -rf ~/.cache/huggingface/hub
     ```
-    *(Đặt `HF_HOME=/ổ/khác/hf` trong `~/.bashrc`/`~/.zshrc` để chuyển hẳn cache
-    sang ổ rộng hơn thay vì phải dọn định kỳ.)*
+    *(Set `HF_HOME=/other/disk/hf` in `~/.bashrc`/`~/.zshrc` to move the cache to
+    a roomier disk instead of cleaning it periodically.)*
 * 🟢 **PyTorch / Keras / Whisper / CLIP:**
     ```bash
     rm -rf ~/.cache/torch/hub ~/.cache/torch/checkpoints
     rm -rf ~/.cache/whisper ~/.cache/clip
     du -sh ~/.keras/models 2>/dev/null
     ```
-* 🟢 **Cache JIT của GPU** (tự sinh lại, chỉ chậm lần chạy đầu):
+* 🟢 **GPU JIT caches** (regenerate themselves, only the first run is slower):
     ```bash
     rm -rf ~/.nv/ComputeCache ~/.triton/cache
     ```
-* 🟡 **Virtualenv chứa `torch`/`mediapipe`/`onnxruntime`** — mỗi cái 2–6 GB, và
-  thường có nhiều bản trùng nhau ở các project khác nhau:
+* 🟡 **Virtualenvs containing `torch`/`mediapipe`/`onnxruntime`** — 2–6 GB each,
+  and usually duplicated across several projects:
     ```bash
     find ~ -maxdepth 5 -type d \( -name '.venv' -o -name 'venv' \) -prune 2>/dev/null \
       | xargs -I{} du -sh {} 2>/dev/null | sort -rh | head -10
     ```
-    Xóa được vì `pip install -r requirements.txt` dựng lại được — nhưng **kiểm tra
-  project đó có còn dùng không** trước khi xóa. Xem thêm §D2.
+    Deletable, because `pip install -r requirements.txt` rebuilds them — but
+    **check whether the project is still in use** first. See also §D2.
 
-## A5. Ảnh / video do AI sinh ra
+## A5. AI-generated images and video
 
-Output của Stable Diffusion, ComfyUI, Automatic1111… là **dữ liệu thật** (🔴) —
-chỉ dọn phần model và cache, và tự rà thư mục output:
+Output from Stable Diffusion, ComfyUI, Automatic1111… is **real data** (🔴) — only
+clean the models and caches, and review output directories by hand:
 
 ```bash
 du -sh ~/stable-diffusion-webui/models ~/ComfyUI/models 2>/dev/null
 du -sh ~/stable-diffusion-webui/outputs ~/ComfyUI/output 2>/dev/null
 ```
 
-## A6. Combo AI 1 lệnh (mức an toàn 🟢 — chỉ cache, không đụng transcript)
+## A6. One-shot AI combo (🟢 — cache only, transcripts untouched)
 
-Đóng IDE trước khi chạy:
+Quit your IDE first:
 
 ```bash
-# 🟢 TOÀN BỘ block này chỉ xóa cache tái tạo được: không đụng transcript
-# (~/.claude/projects, ~/.codex/sessions), không đụng settings, không đụng model.
+# 🟢 THE WHOLE BLOCK deletes only regenerable cache: no transcripts
+# (~/.claude/projects, ~/.codex/sessions), no settings, no models.
 CODE=~/.config/Code   # macOS: CODE=~/Library/Application\ Support/Code
 rm -rf "$CODE"/Cache "$CODE"/CachedData "$CODE"/CachedExtensionVSIXs "$CODE"/GPUCache "$CODE"/logs \
   && rm -rf ~/.claude/shell-snapshots ~/.claude/statsig ~/.cache/claude-cli-nodejs \
@@ -380,94 +392,96 @@ rm -rf "$CODE"/Cache "$CODE"/CachedData "$CODE"/CachedExtensionVSIXs "$CODE"/GPU
 
 ---
 
-# PHẦN B — UBUNTU / DEBIAN
+# PART B — UBUNTU / DEBIAN
 
-## B1. Dọn dẹp hệ thống (cơ bản)
+## B1. System cleanup (the basics)
 
-* 🟢 **Xóa các gói phụ thuộc không còn dùng** (kể cả kernel cũ):
+* 🟢 **Drop dependencies nothing needs any more** (old kernels included):
     ```bash
     sudo apt autoremove -y
     ```
-* 🔴 **Xóa luôn cả file cấu hình của các gói đó** (mạnh tay hơn, dọn kernel cũ triệt để):
+* 🔴 **Also purge those packages' config files** (heavier handed, clears old
+  kernels completely):
     ```bash
     sudo apt autoremove --purge -y
     ```
-* 🟢 **Xóa toàn bộ cache gói `.deb` đã tải:**
+* 🟢 **Delete every downloaded `.deb` in the package cache:**
     ```bash
     sudo apt clean
     ```
-* 🟢 **Chỉ xóa các gói `.deb` đã cũ/hết hạn** (nhẹ tay hơn `clean`):
+* 🟢 **Delete only stale/superseded `.deb` files** (gentler than `clean`):
     ```bash
     sudo apt autoclean
     ```
-* 🟢 **Dọn nhật ký hệ thống** — giữ 3 ngày, hoặc giới hạn theo dung lượng:
+* 🟢 **Vacuum the system journal** — keep 3 days, or cap it by size:
     ```bash
-    journalctl --disk-usage            # xem log đang chiếm bao nhiêu
+    journalctl --disk-usage            # how much the logs take
     sudo journalctl --vacuum-time=3d
     sudo journalctl --vacuum-size=200M
     ```
-* 🟢 **Log xoay vòng cũ trong `/var/log`:**
+* 🟢 **Old rotated logs in `/var/log`:**
     ```bash
     sudo find /var/log -type f -regex '.*\.\(gz\|old\|[0-9]+\)$' -delete
     ```
-* 🟢 **Dọn thùng rác:**
+* 🟢 **Empty the trash:**
     ```bash
-    find ~/.local/share/Trash -mindepth 1 -delete 2>/dev/null   # không glob, an toàn trên zsh
+    find ~/.local/share/Trash -mindepth 1 -delete 2>/dev/null   # glob-free, zsh-safe
     ```
-* 🟢 **Báo cáo crash cũ (`/var/crash`) — thường vài GB:**
+* 🟢 **Old crash reports (`/var/crash`) — often several GB:**
     ```bash
     sudo rm -rf /var/crash/*
     ```
-* 🟡 **Kiểm tra kernel đang dùng trước khi gỡ kernel cũ:**
+* 🟡 **Check which kernel you are on before removing old ones:**
     ```bash
-    uname -r                                  # kernel đang chạy — TUYỆT ĐỐI không gỡ
-    dpkg -l 'linux-image-*' | grep '^ii'      # danh sách kernel đã cài
+    uname -r                                  # the running kernel — NEVER remove this one
+    dpkg -l 'linux-image-*' | grep '^ii'      # installed kernels
     ```
 
-## B2. Snap, Flatpak, cấu hình mồ côi
+## B2. Snap, Flatpak, orphaned configs
 
-* 🟢 **Xóa các bản Snap cũ (thường giải phóng nhiều GB):**
+* 🟢 **Remove old Snap revisions (usually several GB):**
     ```bash
     LANG=C snap list --all | awk '/disabled/{print $1, $3}' \
       | while read -r snapname revision; do
           sudo snap remove "$snapname" --revision="$revision"
         done
     ```
-* 🟡 **Giới hạn snap chỉ giữ 2 bản (chặn rác từ gốc):**
+* 🟡 **Cap snap at 2 retained revisions (stops the junk at the source):**
     ```bash
     sudo snap set system refresh.retain=2
     ```
-* 🟢 **Flatpak — gỡ runtime không còn ai dùng:**
+* 🟢 **Flatpak — remove runtimes nothing uses:**
     ```bash
     flatpak uninstall --unused -y
     flatpak repair --user
     ```
-* 🟡 **Xóa file cấu hình rác của phần mềm đã gỡ (residual configs `rc`):**
+* 🟡 **Purge leftover config of removed software (residual `rc` configs):**
     ```bash
     dpkg -l | awk '/^rc/ { print $2 }' | sudo xargs --no-run-if-empty dpkg --purge
     ```
-* 🔴 **Xóa cache người dùng toàn bộ** — an toàn về mặt dữ liệu nhưng sẽ **đăng xuất
-  một số app / mất thumbnail / lần mở app sau chậm**. Nên đóng hết ứng dụng trước:
+* 🔴 **Wipe the whole user cache** — safe data-wise, but it will **log you out of
+  some apps / lose thumbnails / make the next app launch slow**. Quit everything
+  first:
     ```bash
     rm -rf ~/.cache/*
-    # Nhẹ tay hơn — chỉ thumbnail:
+    # Gentler — thumbnails only:
     rm -rf ~/.cache/thumbnails
     ```
 
-## B3. Timeshift / snapshot (nếu có cài)
+## B3. Timeshift / snapshots (if installed)
 
-🔴 Snapshot là bản sao lưu hệ thống — xóa là mất khả năng khôi phục.
+🔴 Snapshots are system backups — deleting them removes your ability to roll back.
 
 ```bash
-sudo timeshift --list                                       # 🟢 chỉ đọc
-sudo timeshift --delete --snapshot '2025-01-01_00-00-00'    # 🔴 mất bản khôi phục đó vĩnh viễn
+sudo timeshift --list                                       # 🟢 read-only
+sudo timeshift --delete --snapshot '2025-01-01_00-00-00'    # 🔴 that restore point is gone for good
 ```
 
-## B4. Combo Ubuntu 1 lệnh (mức an toàn 🟢)
+## B4. One-shot Ubuntu combo (🟢)
 
 ```bash
-# 🟢 toàn bộ block: chỉ gói/cache/log tái tạo được. Thùng rác 🟡 — kiểm tra
-# `ls ~/.local/share/Trash/files` trước nếu bạn hay dùng nó làm chỗ để tạm.
+# 🟢 the whole block: only regenerable packages/caches/logs. Trash is 🟡 — check
+# `ls ~/.local/share/Trash/files` first if you use it as temporary storage.
 sudo apt autoremove -y && sudo apt autoclean && sudo apt clean \
   && sudo journalctl --vacuum-time=3d \
   && find ~/.local/share/Trash -mindepth 1 -delete 2>/dev/null \
@@ -477,32 +491,32 @@ sudo apt autoremove -y && sudo apt autoclean && sudo apt clean \
 
 ---
 
-# PHẦN C — macOS
+# PART C — macOS
 
-macOS không có `apt`/`snap`/`journalctl`. Bảng đối chiếu nhanh:
+macOS has no `apt`/`snap`/`journalctl`. Quick translation table:
 
-| Việc cần làm | Ubuntu | macOS |
+| What you want | Ubuntu | macOS |
 |---|---|---|
-| Package manager hệ thống | `apt` | `brew` |
-| Cache gói | `sudo apt clean` | `brew cleanup -s --prune=all` |
-| Gỡ dependency thừa | `apt autoremove` | `brew autoremove` |
-| Log hệ thống | `journalctl --vacuum-*` | `sudo rm -rf /private/var/log/*.gz` |
-| Thùng rác | `~/.local/share/Trash` | `~/.Trash` |
-| Cache người dùng | `~/.cache` | `~/Library/Caches` |
-| Snapshot hệ thống | Timeshift | APFS local snapshots (`tmutil`) |
+| System package manager | `apt` | `brew` |
+| Package cache | `sudo apt clean` | `brew cleanup -s --prune=all` |
+| Remove orphaned dependencies | `apt autoremove` | `brew autoremove` |
+| System logs | `journalctl --vacuum-*` | `sudo rm -rf /private/var/log/*.gz` |
+| Trash | `~/.local/share/Trash` | `~/.Trash` |
+| User cache | `~/.cache` | `~/Library/Caches` |
+| System snapshots | Timeshift | APFS local snapshots (`tmutil`) |
 
 ## C1. Homebrew
 
-* 🟢 **Dọn version cũ + cache tải về (thường 5–20 GB):**
+* 🟢 **Clear old versions and the download cache (typically 5–20 GB):**
     ```bash
     brew cleanup -s --prune=all
     rm -rf "$(brew --cache)"
     ```
-* 🟡 **Gỡ các formula chỉ còn tồn tại vì là dependency của thứ đã gỡ:**
+* 🟡 **Remove formulae that only exist as dependencies of something you removed:**
     ```bash
     brew autoremove
     ```
-* **Xem cái gì đang nặng để cân nhắc gỡ tay:**
+* **See what is heavy, to decide what to remove by hand:**
     ```bash
     brew list --formula
     brew list --cask
@@ -510,112 +524,114 @@ macOS không có `apt`/`snap`/`journalctl`. Bảng đối chiếu nhanh:
     brew doctor
     ```
 
-## C2. Xcode & iOS development — nguồn rác lớn nhất trên máy Mac dev
+## C2. Xcode & iOS development — the biggest junk source on a Mac dev machine
 
-* 🟢 **DerivedData (build cache — hay chiếm 20–80 GB):**
+* 🟢 **DerivedData (build cache — often 20–80 GB):**
     ```bash
     du -sh ~/Library/Developer/Xcode/DerivedData
-    rm -rf ~/Library/Developer/Xcode/DerivedData      # Xcode tự tạo lại thư mục này
+    rm -rf ~/Library/Developer/Xcode/DerivedData      # Xcode recreates the directory
     ```
-* 🟡 **iOS DeviceSupport — symbol của các bản iOS cũ, mỗi bản ~3–6 GB:**
+* 🟡 **iOS DeviceSupport — symbols for old iOS versions, ~3–6 GB each:**
     ```bash
     du -sh ~/Library/Developer/Xcode/iOS\ DeviceSupport/*
-    rm -rf ~/Library/Developer/Xcode/iOS\ DeviceSupport/*     # chỉ giữ bản iOS đang test
+    rm -rf ~/Library/Developer/Xcode/iOS\ DeviceSupport/*     # keep only the iOS you test on
     ```
-* 🟢 **Simulator rác (runtime/thiết bị không còn khả dụng):**
+* 🟢 **Simulator junk (unavailable runtimes and devices):**
     ```bash
     xcrun simctl delete unavailable
-    xcrun simctl shutdown all && xcrun simctl erase all       # 🟡 xóa sạch data trong simulator
+    xcrun simctl shutdown all && xcrun simctl erase all       # 🟡 wipes all simulator data
     rm -rf ~/Library/Developer/CoreSimulator/Caches/*
-    du -sh ~/Library/Developer/CoreSimulator/Devices          # kiểm tra trước
+    du -sh ~/Library/Developer/CoreSimulator/Devices          # check first
     ```
-* 🔴 **Archives (file `.xcarchive` để submit App Store — cần cho việc symbolicate crash):**
+* 🔴 **Archives (`.xcarchive` files for App Store submissions — needed to
+  symbolicate crash reports):**
     ```bash
     du -sh ~/Library/Developer/Xcode/Archives
-    # Xóa archive cũ hơn 90 ngày (-mindepth 2 để không đụng vào thư mục gốc):
+    # Archives older than 90 days (-mindepth 2 keeps the root directory safe):
     find ~/Library/Developer/Xcode/Archives -mindepth 2 -maxdepth 2 -type d -mtime +90 -print
-    # kiểm tra danh sách trên xong mới thay -print bằng: -exec rm -rf {} +
+    # read that list, and only then swap -print for: -exec rm -rf {} +
     ```
-* 🟢 **Cache khác của Xcode / SwiftPM:**
+* 🟢 **Other Xcode / SwiftPM caches:**
     ```bash
     rm -rf ~/Library/Caches/org.swift.swiftpm
     rm -rf ~/Library/Developer/Xcode/UserData/IB\ Support
     rm -rf ~/Library/Developer/Xcode/iOS\ Device\ Logs/*
     ```
 
-## C3. Cache & log hệ thống macOS
+## C3. macOS system caches & logs
 
-* 🟡 **Cache người dùng** — đóng hết app trước khi chạy:
+* 🟡 **User caches** — quit every app before running this:
     ```bash
-    du -sh ~/Library/Caches/* | sort -rh | head -20     # xem trước
+    du -sh ~/Library/Caches/* | sort -rh | head -20     # look first
     rm -rf ~/Library/Caches/*
     ```
-* 🟡 **Log người dùng:**
+* 🟡 **User logs:**
     ```bash
     rm -rf ~/Library/Logs/*
     ```
-* 🔴 **Cache cấp hệ thống** (cần `sudo`, một số app có thể phải mở lại):
+* 🔴 **System-level caches** (needs `sudo`; some apps may need reopening):
     ```bash
     sudo rm -rf /Library/Caches/*
     sudo rm -rf /private/var/log/*.gz /private/var/log/asl/*.asl
     ```
-* 🟢 **Thùng rác (cả ổ ngoài):**
+* 🟢 **Trash (external drives included):**
     ```bash
-    find ~/.Trash -mindepth 1 -delete 2>/dev/null              # không glob → chạy được trên zsh
+    find ~/.Trash -mindepth 1 -delete 2>/dev/null              # glob-free → zsh-safe
     sudo find /Volumes -maxdepth 2 -name '.Trashes' -exec rm -rf {} + 2>/dev/null
     ```
-* 🟢 **Giải phóng RAM/disk cache đang giữ (an toàn, chỉ hơi khựng máy vài giây):**
+* 🟢 **Release held RAM/disk cache (safe, the machine stutters for a few seconds):**
     ```bash
     sudo purge
     ```
 
-## C4. APFS local snapshots & "Purgeable space"
+## C4. APFS local snapshots & "purgeable space"
 
-Đây là lý do kinh điển khiến Finder báo còn 5 GB trong khi `du` chỉ thấy dữ liệu ít
-hơn nhiều: Time Machine giữ snapshot cục bộ ngay trên ổ.
+This is the classic reason Finder claims 5 GB free while `du` accounts for far
+less data: Time Machine keeps local snapshots on the disk itself.
 
 ```bash
-tmutil listlocalsnapshots /                       # liệt kê snapshot
+tmutil listlocalsnapshots /                       # list the snapshots
 ```
 
-* 🟡 **Ép hệ thống dọn snapshot cho tới khi có 20 GB trống** (`4` = mức khẩn cấp nhất):
+* 🟡 **Force the system to thin snapshots until 20 GB is free** (`4` = the most
+  urgent priority):
     ```bash
     sudo tmutil thinlocalsnapshots / 21474836480 4
     ```
-* 🔴 **Xóa hẳn một snapshot cụ thể:**
+* 🔴 **Delete one specific snapshot outright:**
     ```bash
     sudo tmutil deletelocalsnapshots 2025-01-01-000000
     ```
 
-## C5. Rác đặc thù macOS khác
+## C5. Other macOS-specific junk
 
-* 🔴 **Backup iPhone/iPad (rất nặng, là dữ liệu thật):**
+* 🔴 **iPhone/iPad backups (very large, and real data):**
     ```bash
     du -sh ~/Library/Application\ Support/MobileSync/Backup/*
     ```
-* 🟡 **File đính kèm Mail đã tải:**
+* 🟡 **Downloaded Mail attachments:**
     ```bash
     du -sh ~/Library/Containers/com.apple.mail/Data/Library/Mail\ Downloads 2>/dev/null
     ```
-* 🟡 **Docker Desktop — file ổ ảo (xem thêm §D6):**
+* 🟡 **Docker Desktop — the virtual disk file (see also §D6):**
     ```bash
     du -sh ~/Library/Containers/com.docker.docker/Data/vms 2>/dev/null
     ```
-* 🟢 **Bản cài đặt/DMG cũ trong Downloads:**
+* 🟢 **Old installers/DMGs in Downloads:**
     ```bash
     find ~/Downloads -type f \( -name '*.dmg' -o -name '*.pkg' -o -name '*.zip' \) \
       -mtime +30 -exec ls -lh {} + | awk '{print $5, $9}'
     ```
-* 🟡 **iOS/macOS software update đã tải dở:**
+* 🟡 **Partially downloaded iOS/macOS software updates:**
     ```bash
     sudo rm -rf /Library/Updates/*
     ```
 
-## C6. Combo macOS 1 lệnh (mức an toàn 🟢)
+## C6. One-shot macOS combo (🟢)
 
 ```bash
-# 🟢 toàn bộ block: cache brew, DerivedData, simulator rác, thùng rác.
-# 🟡 duy nhất ~/.Trash — chắc chắn trong đó không còn gì bạn cần.
+# 🟢 the whole block: brew cache, DerivedData, simulator junk, trash.
+# 🟡 only ~/.Trash — make sure nothing in there still matters.
 brew cleanup -s --prune=all \
   && rm -rf "$(brew --cache)" ~/Library/Developer/Xcode/DerivedData \
   && find ~/.Trash -mindepth 1 -delete 2>/dev/null \
@@ -626,270 +642,280 @@ brew cleanup -s --prune=all \
 
 ---
 
-# PHẦN D — MÔI TRƯỜNG DEV (dùng chung cả 2 OS)
+# PART D — DEV ENVIRONMENTS (both OSes)
 
-Với máy lập trình viên, phần này thường giải phóng **nhiều hơn cả phần hệ điều hành**.
-Mọi dòng có thao tác xóa đều được gắn nhãn ngay trong code block.
+On a developer machine this part usually reclaims **more than the OS sections do**.
+Every line that deletes something is labelled inside the code block.
 
 ## D1. Node.js — NVM, npm, yarn, pnpm, bun
 
-**Quản lý phiên bản Node bằng NVM:**
+**Node versions via NVM:**
 
 ```bash
-nvm ls                              # 🟢 chỉ đọc — dòng N/A là chưa cài, không tốn dung lượng
-du -sh ~/.nvm/versions/node/* | sort -rh   # 🟢 chỉ đọc
-nvm uninstall 14.17.0               # 🟡 xóa 1 bản Node; project nào ghim bản đó sẽ gãy
-nvm current && cat .nvmrc 2>/dev/null      # 🟢 kiểm tra bản đang dùng TRƯỚC khi gỡ
+nvm ls                              # 🟢 read-only — an N/A line means not installed, no space used
+du -sh ~/.nvm/versions/node/* | sort -rh   # 🟢 read-only
+nvm uninstall 14.17.0               # 🟡 removes one Node; projects pinned to it break
+nvm current && cat .nvmrc 2>/dev/null      # 🟢 check what you are on BEFORE removing anything
 ```
 
-*(macOS cài qua Homebrew thì dùng `brew uninstall node@18` — cũng 🟡; hoặc dùng
-`fnm`/`volta`, xóa tương tự trong `~/.local/share/fnm` / `~/.volta/tools`.)*
+*(Installed via Homebrew on macOS? Use `brew uninstall node@18` — also 🟡. With
+`fnm`/`volta`, remove from `~/.local/share/fnm` / `~/.volta/tools` the same way.)*
 
-**Cache của các package manager:**
+**Package manager caches:**
 
 ```bash
-du -sh ~/.npm ~/.cache/yarn ~/Library/Caches/Yarn ~/.bun/install/cache 2>/dev/null  # 🟢 chỉ đọc
-pnpm store path && du -sh "$(pnpm store path)"   # 🟢 chỉ đọc
+du -sh ~/.npm ~/.cache/yarn ~/Library/Caches/Yarn ~/.bun/install/cache 2>/dev/null  # 🟢 read-only
+pnpm store path && du -sh "$(pnpm store path)"   # 🟢 read-only
 
-npm cache clean --force            # 🟢 ~/.npm — cài lại tự tải về
+npm cache clean --force            # 🟢 ~/.npm — re-downloaded on next install
 yarn cache clean                   # 🟢 yarn classic
 yarn cache clean --all             # 🟢 yarn berry
-pnpm store prune                   # 🟢 chỉ xóa package không project nào tham chiếu
+pnpm store prune                   # 🟢 only packages no project references
 bun pm cache rm                    # 🟢
-rm -rf ~/.npm/_npx                 # 🟢 cache của npx
+rm -rf ~/.npm/_npx                 # 🟢 the npx cache
 ```
 
-> ⚠️ Chỉ 🟢 khi bạn **đang online**. Nếu sắp làm việc offline hoặc đang ở mạng chậm,
-> mất cache = không `npm install` được nữa → khi đó phải coi là 🟡.
+> ⚠️ These are only 🟢 while you are **online**. If you are about to work offline
+> or you are on a slow connection, losing the cache means `npm install` stops
+> working → treat it as 🟡 instead.
 
-**`node_modules` — thủ phạm số 1.**
+**`node_modules` — culprit number one.**
 
 ```bash
-# 🟢 chỉ đọc — liệt kê mọi node_modules kèm dung lượng, nặng nhất lên đầu
+# 🟢 read-only — every node_modules with its size, heaviest first
 find ~ -name node_modules -type d -prune 2>/dev/null \
   | xargs -I{} du -sh {} 2>/dev/null | sort -rh | head -20
 
-# 🟢 chỉ đọc — xem project nào không đụng tới trong 90 ngày
+# 🟢 read-only — which projects you have not touched in 90 days
 find ~/projects -name node_modules -type d -prune -mtime +90 -print
 
-# 🔴 XÓA THẬT — chỉ chạy sau khi đã đọc kỹ danh sách ở trên.
-# Rủi ro: project dùng lockfile cũ / package đã bị gỡ khỏi registry sẽ không
-# install lại được y hệt. Không đụng repo đang dở việc.
+# 🔴 ACTUAL DELETE — only after reading the list above carefully.
+# The risk: a project on an old lockfile, or with a package pulled from the
+# registry, will not reinstall identically. Never touch a repo mid-task.
 # find ~/projects -name node_modules -type d -prune -mtime +90 -exec rm -rf {} +
 ```
 
 ```bash
-npx npkill        # 🟡 công cụ tương tác — bạn tự chọn thư mục để xóa, xóa là mất luôn
+npx npkill        # 🟡 interactive — you pick the directories, and they go immediately
 ```
 
 **Electron / build output:**
 
 ```bash
-du -sh ~/.cache/electron ~/.electron ~/.cache/electron-builder 2>/dev/null   # 🟢 chỉ đọc
-rm -rf ~/.cache/electron ~/.electron ~/.cache/electron-builder    # 🟡 build Electron kế tiếp phải tải lại ~200MB/bản
-rm -rf ~/Library/Caches/electron ~/Library/Caches/electron-builder   # 🟡 macOS, tương tự
+du -sh ~/.cache/electron ~/.electron ~/.cache/electron-builder 2>/dev/null   # 🟢 read-only
+rm -rf ~/.cache/electron ~/.electron ~/.cache/electron-builder    # 🟡 next Electron build re-downloads ~200MB per version
+rm -rf ~/Library/Caches/electron ~/Library/Caches/electron-builder   # 🟡 macOS, same thing
 ```
 
 ## D2. Python
 
 ```bash
-du -sh ~/.cache/pip ~/.cache/uv ~/.cache/pypoetry 2>/dev/null   # 🟢 chỉ đọc
+du -sh ~/.cache/pip ~/.cache/uv ~/.cache/pypoetry 2>/dev/null   # 🟢 read-only
 
-pip cache purge                       # 🟢 cache wheel — tải lại được
-uv cache clean                        # 🟢 nếu dùng uv
-conda clean --all -y                  # 🟡 gỡ cả package tarball + index; env vẫn còn nguyên
+pip cache purge                       # 🟢 wheel cache — re-downloadable
+uv cache clean                        # 🟢 if you use uv
+conda clean --all -y                  # 🟡 drops package tarballs + index; envs stay intact
 rm -rf ~/.cache/pypoetry              # 🟢 Poetry (Ubuntu)
 rm -rf ~/Library/Caches/pypoetry      # 🟢 Poetry (macOS)
 ```
 
 ```bash
-# 🟢 bytecode tự sinh lại khi chạy — an toàn tuyệt đối
+# 🟢 bytecode regenerates on the next run — completely safe
 find ~ -type d -name __pycache__ -prune -exec rm -rf {} + 2>/dev/null
 find ~ -type f -name '*.pyc' -delete 2>/dev/null
 ```
 
 ```bash
-# 🟢 chỉ đọc — tìm virtualenv nặng (bản có torch/mediapipe thường 2–6 GB, xem §A4)
+# 🟢 read-only — find heavy virtualenvs (ones with torch/mediapipe are 2–6 GB, see §A4)
 find ~ -maxdepth 4 -type d \( -name '.venv' -o -name 'venv' \) -prune 2>/dev/null \
   | xargs -I{} du -sh {} 2>/dev/null | sort -rh | head
 
-# 🔴 xóa 1 venv cụ thể — dựng lại được bằng requirements.txt/pyproject.toml,
-# NHƯNG chỉ khi file đó còn và pin version còn cài được. Kiểm tra trước khi xóa:
+# 🔴 delete one specific venv — rebuildable from requirements.txt/pyproject.toml,
+# BUT only while that file exists and its pins still install. Check first:
 # ls <project>/requirements.txt <project>/pyproject.toml && rm -rf <project>/.venv
 ```
 
 ## D3. Rust
 
-`target/` là hố đen dung lượng — mỗi project vài GB là bình thường.
+`target/` is a black hole — a few GB per project is normal.
 
 ```bash
-du -sh ~/.cargo/registry ~/.cargo/git        # 🟢 chỉ đọc
-# 🟢 chỉ đọc — tìm mọi thư mục target/
+du -sh ~/.cargo/registry ~/.cargo/git        # 🟢 read-only
+# 🟢 read-only — find every target/ directory
 find ~ -type d -name target -prune 2>/dev/null \
   | xargs -I{} du -sh {} 2>/dev/null | sort -rh | head -20
 
-cargo clean                                  # 🟡 trong từng project — build kế tiếp là full rebuild (chậm)
-rm -rf ~/.cargo/registry/cache ~/.cargo/registry/src   # 🟢 tải lại được khi build
+cargo clean                                  # 🟡 per project — the next build is a full rebuild (slow)
+rm -rf ~/.cargo/registry/cache ~/.cargo/registry/src   # 🟢 re-fetched when you build
 ```
 
 ```bash
-cargo install cargo-sweep                    # 🟢 chỉ cài công cụ
-cargo sweep --time 30 --dry-run --recursive ~/projects   # 🟢 xem trước sẽ xóa gì
-cargo sweep --time 30 --recursive ~/projects             # 🟡 xóa artifact >30 ngày trong mọi target/
+cargo install cargo-sweep                    # 🟢 installs the tool only
+cargo sweep --time 30 --dry-run --recursive ~/projects   # 🟢 preview what would go
+cargo sweep --time 30 --recursive ~/projects             # 🟡 removes artifacts >30 days old in every target/
 ```
 
 ```bash
-rustup toolchain list                        # 🟢 chỉ đọc
-rustup toolchain uninstall nightly-2023-01-01   # 🟡 project ghim toolchain đó (rust-toolchain.toml) sẽ phải tải lại
+rustup toolchain list                        # 🟢 read-only
+rustup toolchain uninstall nightly-2023-01-01   # 🟡 projects pinning it (rust-toolchain.toml) re-download
 ```
 
 ## D4. Go
 
 ```bash
-du -sh "$(go env GOMODCACHE)" "$(go env GOCACHE)"   # 🟢 chỉ đọc
+du -sh "$(go env GOMODCACHE)" "$(go env GOCACHE)"   # 🟢 read-only
 
-go clean -cache        # 🟢 build cache — build sau chậm hơn, không mất gì
-go clean -testcache    # 🟢 kết quả test cache
-go clean -modcache     # 🟡 module cache — phải tải lại toàn bộ dependency, hỏng nếu offline
+go clean -cache        # 🟢 build cache — next build is slower, nothing is lost
+go clean -testcache    # 🟢 cached test results
+go clean -modcache     # 🟡 module cache — every dependency re-downloads, breaks you offline
 ```
 
 ## D5. Java / Android / Gradle / Maven
 
 ```bash
-du -sh ~/.gradle ~/.m2/repository 2>/dev/null   # 🟢 chỉ đọc
-du -sh ~/Android/Sdk ~/Library/Android/sdk 2>/dev/null   # 🟢 chỉ đọc
-du -sh ~/.android/avd/* 2>/dev/null             # 🟢 chỉ đọc — mỗi emulator vài GB
+du -sh ~/.gradle ~/.m2/repository 2>/dev/null   # 🟢 read-only
+du -sh ~/Android/Sdk ~/Library/Android/sdk 2>/dev/null   # 🟢 read-only
+du -sh ~/.android/avd/* 2>/dev/null             # 🟢 read-only — a few GB per emulator
 
-./gradlew --stop                       # 🟢 chỉ dừng daemon — BẮT BUỘC chạy trước khi xóa
-# 🟢 chỉ cache build tăng tiến (find thay glob cho zsh)
+./gradlew --stop                       # 🟢 stops the daemon only — REQUIRED before deleting
+# 🟢 incremental build cache only (find instead of a glob, for zsh)
 find ~/.gradle/caches -maxdepth 1 -name 'build-cache-*' -exec rm -rf {} + 2>/dev/null
-rm -rf ~/.gradle/daemon                # 🟢 log của daemon
-rm -rf ~/.gradle/caches                # 🟡 build kế tiếp tải lại toàn bộ dependency (rất lâu)
-rm -rf ~/.gradle/wrapper/dists         # 🟡 mỗi project tải lại bản Gradle của nó
-rm -rf ~/.m2/repository                # 🟡 Maven — tương tự, và mất luôn artifact bạn `mvn install` cục bộ
+rm -rf ~/.gradle/daemon                # 🟢 daemon logs
+rm -rf ~/.gradle/caches                # 🟡 next build re-downloads every dependency (very slow)
+rm -rf ~/.gradle/wrapper/dists         # 🟡 every project re-downloads its Gradle version
+rm -rf ~/.m2/repository                # 🟡 Maven — same, and it also loses your local `mvn install` artifacts
 ```
 
-> 🔴 `~/.m2/repository` có thể chứa **artifact nội bộ do bạn tự build và cài** mà
-> không repo nào tải lại được. Kiểm tra trước: `find ~/.m2/repository -name '*.jar' -newer ~/.m2/settings.xml`.
+> 🔴 `~/.m2/repository` can hold **internal artifacts you built and installed
+> yourself** that no repository can re-fetch. Check first:
+> `find ~/.m2/repository -name '*.jar' -newer ~/.m2/settings.xml`.
 
 ```bash
-# 🔴 xóa emulator (AVD) — mất luôn dữ liệu bên trong máy ảo đó
-# avdmanager list avd            # 🟢 xem trước
-# avdmanager delete avd -n <tên>
+# 🔴 deleting an emulator (AVD) — also loses the data inside that virtual device
+# avdmanager list avd            # 🟢 look first
+# avdmanager delete avd -n <name>
 ```
 
 ## D6. Docker
 
 ```bash
-docker system df                       # 🟢 LUÔN chạy trước khi prune
-docker system df -v                    # 🟢 chi tiết từng image/volume
+docker system df                       # 🟢 ALWAYS run this before pruning
+docker system df -v                    # 🟢 per image/volume detail
 
-docker builder prune -af               # 🟢 chỉ cache build — build lại chậm hơn, không mất gì
-docker image prune                     # 🟢 chỉ xóa image dangling (<none>)
-docker container prune                 # 🟡 xóa container đã dừng — mất dữ liệu ghi trong container layer
-docker system prune                    # 🟡 container dừng + network thừa + image mồ côi + cache build
-docker image prune -a                  # 🟡 xóa mọi image không có container dùng → phải pull lại
-docker system prune -a --volumes       # 🔴 XÓA CẢ VOLUME — mất database/local state của mọi project
+docker builder prune -af               # 🟢 build cache only — rebuilds are slower, nothing lost
+docker image prune                     # 🟢 dangling images only (<none>)
+docker container prune                 # 🟡 removes stopped containers — loses data written in container layers
+docker system prune                    # 🟡 stopped containers + unused networks + orphan images + build cache
+docker image prune -a                  # 🟡 every image with no container → you have to pull again
+docker system prune -a --volumes       # 🔴 VOLUMES TOO — loses every project's database/local state
 ```
 
 ```bash
-docker volume ls                       # 🟢 xem trước
-docker volume rm <tên>                 # 🔴 mất hẳn dữ liệu trong volume đó
+docker volume ls                       # 🟢 look first
+docker volume rm <name>                # 🔴 the data in that volume is gone
 ```
 
-Trên macOS, dung lượng chỉ thực sự trả lại cho ổ đĩa sau khi Docker Desktop thu nhỏ
-ổ ảo: **Docker Desktop → Settings → Resources → Advanced → Disk image size** (🟡),
-hoặc **Troubleshoot → Reset to factory defaults** (🔴 mất toàn bộ image + volume).
+On macOS the space only truly returns to the disk once Docker Desktop shrinks the
+virtual disk: **Docker Desktop → Settings → Resources → Advanced → Disk image
+size** (🟡), or **Troubleshoot → Reset to factory defaults** (🔴 loses every image
+and volume).
 
 ## D7. Git
 
 ```bash
-git count-objects -vH                  # 🟢 chỉ đọc — xem repo phình cỡ nào
-# 🟢 chỉ đọc — tìm repo nặng
+git count-objects -vH                  # 🟢 read-only — how bloated the repo is
+# 🟢 read-only — find heavy repos
 find ~ -name '.git' -type d -prune 2>/dev/null \
   | xargs -I{} du -sh {} 2>/dev/null | sort -rh | head -15
 
-git gc                                 # 🟢 nén an toàn, giữ nguyên mọi thứ còn tham chiếu
-git gc --aggressive --prune=now        # 🟡 nén mạnh + xóa NGAY object mồ côi:
-                                       #    mất reflog cũ → không `git reset` ngược lại được nữa
+git gc                                 # 🟢 safe repack, keeps everything still referenced
+git gc --aggressive --prune=now        # 🟡 hard repack + drops orphaned objects NOW:
+                                       #    the old reflog goes, so you cannot `git reset` back
 ```
 
-> 🔴 Đừng chạy `--prune=now` khi vừa `reset --hard` / `rebase` hỏng và còn định
-> cứu commit cũ bằng `git reflog`. Nén xong là mất đường lùi.
+> 🔴 Do not run `--prune=now` right after a bad `reset --hard` / `rebase` when you
+> still hope to recover a commit through `git reflog`. Once it is packed, there is
+> no way back.
 
-## D8. Trình duyệt & IDE (phần không liên quan AI)
+## D8. Browsers & IDEs (the non-AI parts)
 
-> Cache của VS Code/Cursor gắn với panel AI đã nằm ở §A2 — phần này chỉ là trình
-> duyệt và JetBrains.
+> The VS Code/Cursor caches tied to AI panels are in §A2 — this section is
+> browsers and JetBrains only.
 
 ```bash
 # Ubuntu
-du -sh ~/.cache/google-chrome ~/.cache/mozilla ~/.cache/chromium 2>/dev/null   # 🟢 chỉ đọc
-# 🟢 chỉ cache trang, không đụng profile/mật khẩu (find thay glob cho zsh)
+du -sh ~/.cache/google-chrome ~/.cache/mozilla ~/.cache/chromium 2>/dev/null   # 🟢 read-only
+# 🟢 page cache only, never the profile/passwords (find instead of a glob, for zsh)
 find ~/.cache/google-chrome -maxdepth 2 -name 'Cache' -exec rm -rf {} + 2>/dev/null
 find ~/.cache/mozilla -maxdepth 3 -name 'cache2' -exec rm -rf {} + 2>/dev/null
 
 # macOS
-du -sh ~/Library/Caches/Google/Chrome ~/Library/Caches/Firefox 2>/dev/null     # 🟢 chỉ đọc
+du -sh ~/Library/Caches/Google/Chrome ~/Library/Caches/Firefox 2>/dev/null     # 🟢 read-only
 # 🟢
 find ~/Library/Caches/Google/Chrome -maxdepth 2 -name 'Cache' -exec rm -rf {} + 2>/dev/null
 
-# JetBrains (kể cả cache của AI Assistant / Junie) — cả 2 OS
-du -sh ~/.cache/JetBrains ~/Library/Caches/JetBrains 2>/dev/null   # 🟢 chỉ đọc
-# 🟡 IDE phải index lại toàn bộ project (lâu)
+# JetBrains (including AI Assistant / Junie caches) — both OSes
+du -sh ~/.cache/JetBrains ~/Library/Caches/JetBrains 2>/dev/null   # 🟢 read-only
+# 🟡 the IDE has to re-index every project (slow)
 find ~/.cache/JetBrains ~/Library/Caches/JetBrains -maxdepth 2 \
      \( -name 'caches' -o -name 'index' \) -exec rm -rf {} + 2>/dev/null
 ```
 
-> 🔴 **Không** xóa `~/.config/google-chrome` hay `~/Library/Application Support/Google/Chrome`
-> — đó là **profile** (bookmark, mật khẩu, session), không phải cache. Chỉ xóa trong
-> `~/.cache` / `~/Library/Caches`.
+> 🔴 **Never** delete `~/.config/google-chrome` or
+> `~/Library/Application Support/Google/Chrome` — that is the **profile**
+> (bookmarks, passwords, sessions), not a cache. Only delete inside `~/.cache` /
+> `~/Library/Caches`.
 
 ---
 
-# PHẦN E — TUYỆT ĐỐI KHÔNG XÓA
+# PART E — NEVER DELETE
 
-| Đường dẫn | Vì sao |
+| Path | Why |
 |---|---|
-| `/System`, `/private/var/db` (macOS) | Ổ hệ thống chỉ đọc; nghịch vào là hỏng máy. |
-| `~/Library` (nguyên cụm, macOS) | Chứa toàn bộ cấu hình + dữ liệu app, **không phải** chỉ cache. |
-| `/var/lib` (Ubuntu) | Database của apt, Docker, MySQL… |
-| `/boot` | Xóa nhầm kernel đang chạy → máy không boot được. |
-| `~/.ssh`, `~/.gnupg`, `~/.aws`, `~/.config/gh` | Khóa và credential, không tái tạo được. |
-| `~/.claude/settings.json`, `~/.claude.json`, `CLAUDE.md`, `~/.claude/skills`, `~/.claude/agents`, `~/.claude/memory` | Cấu hình, skill, memory bạn tự viết — không tái tạo được. |
-| `~/.config/Code/User/{settings.json,keybindings.json,snippets,History}` | Cấu hình IDE + local history có thể cứu code chưa commit. |
-| `.env`, `~/.config/*/auth.json`, token của Copilot/Claude/Codex | Xóa là phải đăng nhập lại toàn bộ. |
-| `~/Library/Application Support/<app>` | Dữ liệu thật của app (không phải cache). |
-| Docker volume | Database/local state của dự án. `prune --volumes` là 🔴. |
-| Snapshot Timeshift / Time Machine | Là bản backup — mất luôn đường lùi. |
+| `/System`, `/private/var/db` (macOS) | Read-only system volume; messing with it breaks the machine. |
+| `~/Library` (as a whole, macOS) | Holds all app configuration **and** data, not just cache. |
+| `/var/lib` (Ubuntu) | Databases for apt, Docker, MySQL… |
+| `/boot` | Delete the running kernel and the machine will not boot. |
+| `~/.ssh`, `~/.gnupg`, `~/.aws`, `~/.config/gh` | Keys and credentials, not regenerable. |
+| `~/.claude/settings.json`, `~/.claude.json`, `CLAUDE.md`, `~/.claude/skills`, `~/.claude/agents`, `~/.claude/memory` | Config, skills and memory you wrote — not regenerable. |
+| `~/.config/Code/User/{settings.json,keybindings.json,snippets,History}` | IDE config plus a local history that can rescue uncommitted code. |
+| `.env`, `~/.config/*/auth.json`, Copilot/Claude/Codex tokens | Delete them and you re-authenticate everything. |
+| `~/Library/Application Support/<app>` | Real app data, not cache. |
+| Docker volumes | Project databases/local state. `prune --volumes` is 🔴. |
+| Timeshift / Time Machine snapshots | They are backups — you lose the way back. |
 
-Trước mọi lệnh `rm -rf` có wildcard, chạy phiên bản “xem trước” bằng `ls` hoặc
-`du -sh` trên đúng pattern đó. Với `find … -exec rm`, **luôn** chạy với `-print`
-trước, đọc kỹ danh sách, rồi mới đổi thành `-exec`.
+Before any `rm -rf` with a wildcard, run the "preview" version with `ls` or
+`du -sh` on the exact same pattern. With `find … -exec rm`, **always** run it with
+`-print` first, read the list, and only then switch to `-exec`.
 
 ---
 
-# PHẦN F — SCRIPT TỰ ĐỘNG (nhận diện OS)
+# PART F — AUTOMATION SCRIPT (detects the OS)
 
-Lưu thành `~/bin/cleanup.sh`, `chmod +x ~/bin/cleanup.sh`, chạy `cleanup.sh`.
-Script **chỉ làm các thao tác 🟢 và 🟡 nhẹ**, và **in dung lượng trước/sau**.
-Nó cố tình **không** làm bất cứ thao tác 🔴 nào: không đụng transcript AI, không
-`docker system prune -a --volumes`, không xóa `node_modules`/`.venv`/`target`,
-không gỡ model Ollama, không xóa snapshot. Những việc đó phải do bạn tự quyết định
-theo §A–§D. Mỗi nhóm trong script được gắn nhãn ngay trong output khi chạy.
+Save as `~/bin/cleanup.sh`, `chmod +x ~/bin/cleanup.sh`, run `cleanup.sh`. The
+script performs **only 🟢 and light 🟡 actions**, and **prints free space before and
+after**. It deliberately does **no 🔴 action**: it never touches AI transcripts,
+never runs `docker system prune -a --volumes`, never deletes
+`node_modules`/`.venv`/`target`, never removes Ollama models, never deletes
+snapshots. Those are decisions for you to make per §A–§D. Each group is labelled
+in the output as it runs.
+
+> Prefer not to maintain this yourself? That is exactly what
+> [`declutter`](../README.md) automates — same safety tiers, plus an interactive
+> list with real sizes.
 
 ```bash
 #!/usr/bin/env bash
-# Chạy bằng bash kể cả trên macOS (shebang lo việc đó) — không phụ thuộc zsh.
+# Runs under bash even on macOS (the shebang handles that) — no zsh dependency.
 set -uo pipefail
 
 human() { df -h / | awk 'NR==2 {print $4" free of "$2}'; }
 say()   { printf '\n\033[1;36m▸ %s\033[0m\n' "$*"; }
-run()   { echo "  $ $*"; "$@" >/dev/null 2>&1 || echo "    (bỏ qua)"; }
+run()   { echo "  $ $*"; "$@" >/dev/null 2>&1 || echo "    (skipped)"; }
 
-echo "Trước: $(human)"
+echo "Before: $(human)"
 
-say "[🟢] Công cụ AI — chỉ cache, không đụng transcript/model"
+say "[🟢] AI tools — cache only, no transcripts, no models"
 for CODE in "$HOME/.config/Code" "$HOME/Library/Application Support/Code" \
             "$HOME/.config/Cursor" "$HOME/Library/Application Support/Cursor"; do
   [ -d "$CODE" ] || continue
@@ -901,37 +927,37 @@ run rm -rf "$HOME/.claude/shell-snapshots" "$HOME/.claude/statsig" \
            "$HOME/.gemini/tmp" "$HOME/.cursor/ai-tracking"
 run rm -rf "$HOME/.nv/ComputeCache" "$HOME/.triton/cache" "$HOME/.cache/torch/hub"
 find /tmp -maxdepth 1 -name 'claude-*' -exec rm -rf {} + >/dev/null 2>&1
-command -v ollama >/dev/null && echo "  (ollama: chạy 'ollama list' để tự gỡ model không dùng)"
+command -v ollama >/dev/null && echo "  (ollama: run 'ollama list' and remove unused models yourself)"
 
-say "[🟢] Package manager Node — cache tải lại được"
+say "[🟢] Node package managers — re-downloadable caches"
 command -v npm  >/dev/null && run npm cache clean --force
 command -v yarn >/dev/null && run yarn cache clean
 command -v pnpm >/dev/null && run pnpm store prune
 command -v bun  >/dev/null && run bun pm cache rm
 
-say "[🟢] Python / Go / Rust — cache build, không đụng modcache"
+say "[🟢] Python / Go / Rust — build caches, modcache untouched"
 command -v pip   >/dev/null && run pip cache purge
 command -v go    >/dev/null && run go clean -cache -testcache
 command -v cargo >/dev/null && run rm -rf "$HOME/.cargo/registry/cache"
 
-say "[🟢] Docker — chỉ cache build, KHÔNG prune image/volume"
+say "[🟢] Docker — build cache only, NO image/volume prune"
 command -v docker >/dev/null && run docker builder prune -af
 
 case "$(uname -s)" in
   Linux)
-    say "[🟢/🟡] Ubuntu — apt, journal, thùng rác (🟡)"
+    say "[🟢/🟡] Ubuntu — apt, journal, trash (🟡)"
     run sudo apt autoremove -y
     run sudo apt autoclean
     run sudo apt clean
     run sudo journalctl --vacuum-time=3d
     run find "$HOME/.local/share/Trash" -mindepth 1 -delete
     run rm -rf "$HOME/.cache/thumbnails"
-    say "[🟢] Snap — chỉ xóa revision đã disabled"
+    say "[🟢] Snap — disabled revisions only"
     LANG=C snap list --all 2>/dev/null | awk '/disabled/{print $1, $3}' \
       | while read -r n r; do sudo snap remove "$n" --revision="$r" >/dev/null 2>&1; done
     ;;
   Darwin)
-    say "[🟢/🟡] macOS — brew, DerivedData, thùng rác (🟡)"
+    say "[🟢/🟡] macOS — brew, DerivedData, trash (🟡)"
     command -v brew >/dev/null && run brew cleanup -s --prune=all
     command -v brew >/dev/null && run rm -rf "$(brew --cache)"
     run rm -rf "$HOME/Library/Developer/Xcode/DerivedData"
@@ -942,26 +968,26 @@ case "$(uname -s)" in
 esac
 
 echo
-echo "Sau:   $(human)"
+echo "After:  $(human)"
 ```
 
 ---
 
-# PHẦN G — CHECKLIST NHANH
+# PART G — QUICK CHECKLIST
 
-Khi ổ đĩa gần đầy, làm theo đúng thứ tự này:
+When the disk is nearly full, work in exactly this order:
 
-1. `df -h /` — xác nhận thật sự hết chỗ (macOS: nhớ kiểm tra snapshot ở §C4).
-2. **Chạy lệnh đo công cụ AI ở đầu §A** — nhóm này thường chiếm nhiều GB nhất mà
-   không ai để ý, và `apt`/`brew` không chạm tới.
-3. Nếu có Ollama/LM Studio: `ollama list` → gỡ model không dùng (§A3). Đây là bước
-   duy nhất có thể giải phóng vài chục GB trong 1 phút.
-4. `ncdu -x /` hoặc `du -sh ~/* | sort -rh | head` — tìm thủ phạm còn lại.
-5. Chạy combo AI (§A6) rồi combo an toàn của OS (§B4 hoặc §C6).
-6. Quét `node_modules` / `target` / `DerivedData` / `.gradle` / `.venv` (§D).
-7. `docker system df` → prune nếu đang chiếm nhiều (§D6).
-8. Gỡ hẳn app/SDK/phiên bản Node không còn dùng.
-9. Đo lại `df -h /`; nếu vẫn thiếu, mới tính đến các mục 🔴.
+1. `df -h /` — confirm you are actually out of space (on macOS, check snapshots in §C4).
+2. **Run the AI measurement command at the top of §A** — this group usually holds
+   the most gigabytes with the least attention, and `apt`/`brew` never touch it.
+3. If you have Ollama/LM Studio: `ollama list` → remove unused models (§A3). This
+   is the one step that can free tens of gigabytes in a minute.
+4. `ncdu -x /` or `du -sh ~/* | sort -rh | head` — find the remaining culprits.
+5. Run the AI combo (§A6), then your OS's safe combo (§B4 or §C6).
+6. Sweep `node_modules` / `target` / `DerivedData` / `.gradle` / `.venv` (§D).
+7. `docker system df` → prune if it is holding a lot (§D6).
+8. Uninstall apps/SDKs/Node versions you no longer use.
+9. Measure `df -h /` again; only if you are still short, consider the 🔴 items.
 
 ---
-*Tài liệu dành cho Ubuntu/Debian và macOS (Intel & Apple Silicon).*
+*Written for Ubuntu/Debian and macOS (Intel & Apple Silicon).*

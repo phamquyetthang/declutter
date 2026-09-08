@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# actions.sh — thực hiện xóa. Mọi đường đi đều tôn trọng DRY_RUN.
+# actions.sh — the deletions themselves. Every path through here honours DRY_RUN.
 
 _do_rm() {
   local p="$1"
@@ -9,9 +9,9 @@ _do_rm() {
 }
 
 run_item() {
-  # QUAN TRỌNG: phải tách dòng. `local i="$1" act="${I_ACTION[$i]}"` sẽ expand
-  # ${I_ACTION[$i]} bằng biến $i TOÀN CỤC (bash expand hết đối số trước khi gán)
-  # → chạy nhầm mục khác.
+  # IMPORTANT: these have to be separate statements. `local i="$1" act="${I_ACTION[$i]}"`
+  # expands ${I_ACTION[$i]} using the GLOBAL $i (bash expands all arguments
+  # before assigning any of them) — that runs the wrong item.
   local i act extra p rc
   i="$1"; act="${I_ACTION[$i]}"; extra="${I_EXTRA[$i]}"; rc=0
 
@@ -55,8 +55,9 @@ run_item() {
             | while IFS= read -r m; do logline "DRY delete $m"; done
           continue
         fi
-        # -prune để không chui vào thư mục vừa xóa; rm -rf vì `-delete` chỉ xóa
-        # được thư mục RỖNG (đây từng là bug: /tmp/claude-* cũ không bị xóa).
+        # -prune so find does not descend into what it just removed; rm -rf
+        # rather than -delete because -delete only removes EMPTY directories
+        # (that was a real bug once: old /tmp/claude-* dirs never went away).
         find "$p" -mindepth 1 -name "$pat" -mtime "+$days" -prune \
              -exec rm -rf -- {} + 2>/dev/null || rc=1
         logline "agerm $p -name $pat -mtime +$days"

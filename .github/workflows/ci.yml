@@ -11,29 +11,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Phiên bản bash
+      - name: bash version
         run: bash --version | head -1; /bin/bash --version | head -1
 
-      - name: Bit thực thi phải còn nguyên sau khi clone
+      - name: executable bits must survive a clone
         run: |
           for f in declutter install.sh tests/run.sh; do
             if [ ! -x "$f" ]; then
-              echo "::error::$f không có quyền thực thi sau khi clone."
-              echo "Sửa: git update-index --chmod=+x $f"
+              echo "::error::$f is not executable after a clone."
+              echo "Fix: git update-index --chmod=+x $f"
               exit 1
             fi
           done
-          echo "OK: declutter, install.sh, tests/run.sh đều executable"
+          echo "OK: declutter, install.sh, tests/run.sh are all executable"
 
-      - name: Kiểm tra cú pháp
+      - name: syntax check
         run: |
-          for f in declutter lib/*.sh modules/*.sh tests/*.sh install.sh; do
+          for f in declutter lib/*.sh modules/*.sh tests/*.sh install.sh completions/*.bash; do
             bash -n "$f" || exit 1
           done
 
-      # macOS ship bash 3.2 ở /bin/bash — chạy test bằng đúng bản đó để chắc
-      # không lỡ dùng cú pháp bash 4+ (declare -A, mapfile, ${var,,}…)
-      - name: Test (bash hệ thống)
+      # macOS ships bash 3.2 at /bin/bash — run the suite with exactly that, so
+      # bash 4+ syntax (declare -A, mapfile, ${var,,}…) cannot slip in.
+      - name: tests (system bash)
         run: /bin/bash tests/run.sh
 
       - name: shellcheck
@@ -42,32 +42,53 @@ jobs:
           sudo apt-get update -qq && sudo apt-get install -y shellcheck
           shellcheck -S warning -x declutter lib/*.sh modules/*.sh || true
 
-      # Cài thật vào PREFIX tạm rồi chạy QUA SYMLINK — kiểm tra khâu resolve
-      # symlink bằng `readlink` (BSD trên macOS không giống GNU) và cả installer.
-      - name: install.sh + chạy qua symlink
+      # Install for real into a temp PREFIX and run THROUGH THE SYMLINK — this
+      # covers the `readlink` resolution (BSD on macOS differs from GNU) and the
+      # installer itself.
+      - name: install.sh + run through the symlink
         run: |
           set -e
           P="$(mktemp -d)/prefix"
           PREFIX="$P" ./install.sh
-          test -L "$P/bin/declutter" || { echo "::error::không tạo được symlink"; exit 1; }
+          test -L "$P/bin/declutter" || { echo "::error::no symlink created"; exit 1; }
           "$P/bin/declutter" --version
           NO_COLOR=1 "$P/bin/declutter" --report | head -5
-          echo "OK: chạy được qua symlink"
+          echo "OK: runs through the symlink"
+          PREFIX="$P" ./install.sh --uninstall
+          test ! -e "$P/bin/declutter" || { echo "::error::--uninstall left the symlink"; exit 1; }
+          echo "OK: --uninstall is clean"
 
-      - name: install.sh không có git (đường tarball)
+      - name: install.sh without git (the tarball path)
         run: |
           set -e
           P="$(mktemp -d)/prefix"
-          D="$(mktemp -d)"; cp install.sh "$D/"          # tách khỏi repo để buộc phải tải về
+          D="$(mktemp -d)"; cp install.sh "$D/"          # away from the repo, to force a download
           cd "$D"
           PATH="/usr/bin:/bin:/usr/sbin:/sbin" \
             env -u GIT_EXEC_PATH PREFIX="$P" bash -c '
               git() { return 127; }; export -f git 2>/dev/null || true
               ./install.sh' || true
-          # chỉ cần khẳng định đường tarball tải và giải nén được
+          # all this needs to prove is that the tarball path downloads and unpacks
           curl -fsSL "https://codeload.github.com/${GITHUB_REPOSITORY}/tar.gz/refs/heads/main" \
             | tar tz | head -3
-          echo "OK: tarball tải được"
+          echo "OK: tarball downloads"
 
-      - name: Smoke test --report
+      - name: smoke test --report
         run: NO_COLOR=1 ./declutter --report | head -20
+
+      - name: --json must be valid JSON
+        run: |
+          NO_COLOR=1 ./declutter --json > out.json
+          python3 -c 'import json,sys; d=json.load(open("out.json")); \
+            assert d["version"] and "items" in d and "totals" in d, d.keys(); \
+            print("OK:", len(d["items"]), "items")'
+
+      # Written to a file rather than piped into `grep -q`: grep exits at the
+      # first match, declutter dies of SIGPIPE, and that reads as a failure
+      # under pipefail.
+      - name: both languages render
+        run: |
+          NO_COLOR=1 ./declutter --report --lang en > en.txt
+          grep -q "Pre-ticked" en.txt && echo "OK: en"
+          NO_COLOR=1 ./declutter --report --lang vi > vi.txt
+          grep -q "Tick sẵn" vi.txt && echo "OK: vi"

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# core.sh — hằng số, màu sắc, tiện ích đo dung lượng, log. Tương thích bash 3.2.
+# core.sh — constants, colors, size measurement, logging. bash 3.2 compatible.
 
-DECLUTTER_VERSION="1.0.0"
+DECLUTTER_VERSION="1.1.0"
 
 OS_NAME="$(uname -s)"
 case "$OS_NAME" in
@@ -10,7 +10,7 @@ case "$OS_NAME" in
   *)      PLATFORM=other ;;
 esac
 
-# Cho phép test trỏ /tmp sang chỗ khác (xem tests/run.sh)
+# Lets the test suite point /tmp somewhere else (see tests/run.sh)
 TMP_ROOT="${DECLUTTER_TMP_ROOT:-/tmp}"
 
 if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
@@ -25,7 +25,7 @@ head1() { [ "${QUIET:-0}" = 1 ] || printf '\n%s%s%s\n' "$B$C_C" "$*" "$R"; }
 die()   { printf '%s\n' "$*" >&2; exit 1; }
 have()  { command -v "$1" >/dev/null 2>&1; }
 
-# du -sk → KB (0 nếu không tồn tại). An toàn với path có dấu cách.
+# du -sk -> KB (0 when the path is missing). Safe with spaces in paths.
 size_kb() {
   local total=0 p kb
   for p in "$@"; do
@@ -37,14 +37,15 @@ size_kb() {
   printf '%s' "$total"
 }
 
-# KB -> chuỗi người đọc được. Viết thuần bash, KHÔNG gọi awk:
-#  - awk in "1,3G" theo locale vi_VN (phải ép LC_NUMERIC=C mới đúng)
-#  - và mỗi lời gọi là một process; hàm này chạy trong vòng vẽ nên phải rẻ.
+# KB -> human string. Pure bash, deliberately NOT awk:
+#  - awk prints "1,3G" under a vi_VN locale (only LC_NUMERIC=C fixes that)
+#  - and every call is a process; this runs inside the draw loop, so it has to
+#    stay cheap.
 human() {
   local k="$1" t
   case "$k" in ''|*[!0-9]*) k=0 ;; esac
   if [ "$k" -ge 1048576 ]; then
-    t=$(( (k * 10 + 524288) / 1048576 ))      # phần mười GB, làm tròn
+    t=$(( (k * 10 + 524288) / 1048576 ))      # tenths of a GB, rounded
     printf '%s.%sG' "$((t / 10))" "$((t % 10))"
   elif [ "$k" -ge 1024 ]; then
     printf '%sM' "$(( (k + 512) / 1024 ))"
@@ -53,22 +54,23 @@ human() {
   fi
 }
 
-# Cắt/đệm chuỗi theo KÝ TỰ chứ không theo byte — printf "%-46.46s" sẽ cắt
-# giữa một ký tự UTF-8 và làm vỡ tiếng Việt.
-# pad/padl đặt kết quả vào $PAD_OUT thay vì in ra stdout.
-# Lý do: vòng vẽ gọi chúng cho từng dòng, mỗi lần bấm phím. Dùng $(pad …) sẽ
-# fork một subshell cho mỗi ô → hàng chục process mỗi frame → giật và nháy.
+# Pad/truncate by CHARACTER, not by byte — printf "%-46.46s" cuts a multi-byte
+# UTF-8 character in half and breaks Vietnamese (and any accented) text.
+# pad/padl write to $PAD_OUT instead of stdout: the draw loop calls them once
+# per cell per keypress, and $(pad …) would fork a subshell each time — dozens
+# of processes per frame, which is exactly what made the list flicker.
 PAD_OUT=""
 
-# Căn phải theo ký tự ("—" là 3 byte nhưng 1 ký tự nên %8s của printf sai)
+# Right-align by character ("—" is 3 bytes but 1 character, so printf %8s lies)
 padl() {
   local s="$1" w="$2" n
-  n=${#s}          # phải tách dòng: bash expand hết đối số của `local` TRƯỚC khi gán
+  n=${#s}          # separate line on purpose: bash expands every argument of
+                   # `local` BEFORE assigning any of them
   while [ "$n" -lt "$w" ]; do s=" $s"; n=$((n+1)); done
   PAD_OUT="$s"
 }
 
-# Căn trái + cắt theo ký tự
+# Left-align, truncating by character
 pad() {
   local s="$1" w="$2" n
   n=${#s}
@@ -103,6 +105,8 @@ setup_sudo() {
 }
 
 # ── log ────────────────────────────────────────────────────────────────────
+# The log is written in English regardless of --lang: it is a machine record,
+# and it is what people paste into bug reports.
 LOG_STARTED=0
 logline() {
   [ -n "${LOG:-}" ] || return 0

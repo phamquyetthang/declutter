@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# projects.sh — liệt kê artifact nặng của project. CHỈ liệt kê, không bao giờ xóa:
-# node_modules/target/.venv là thứ chỉ bạn mới biết project nào còn dùng.
+# projects.sh — list heavy project artifacts. LISTS ONLY, never deletes:
+# node_modules/target/.venv are things only you know are still in use.
 
 scan_projects() {
   local root="${1:-$HOME}" name found tmp p kb total count
-  head1 "Project artifacts dưới $root (chỉ liệt kê — tool không tự xóa nhóm này)"
-  say "${DIM}Đang quét, có thể mất một lúc…${R}"
+  # shellcheck disable=SC2059
+  head1 "$(printf "$T_PROJ_HEAD" "$root")"
+  say "${DIM}${T_PROJ_SCANNING}${R}"
 
   for name in node_modules target .venv venv .next dist build __pycache__ .aider.tags.cache.v3; do
     found=$(find "$root" -name "$name" -type d -prune 2>/dev/null | head -500)
@@ -19,14 +20,17 @@ scan_projects() {
       total=$((total + kb)); count=$((count + 1))
       printf '%s\t%s\n' "$kb" "$p" >> "$tmp"
     done <<< "$found"
-    printf '\n  %s%s%s — %s ở %d nơi\n' "$B" "$name" "$R" "$(human "$total")" "$count"
+    # shellcheck disable=SC2059
+    printf '\n  %s%s%s — %s %s\n' "$B" "$name" "$R" "$(human "$total")" \
+      "$(printf "$T_PROJ_PLACES" "$count")"
     sort -rn "$tmp" 2>/dev/null | head -"${TOP:-15}" | while IFS=$'\t' read -r kb p; do
       printf '     %8s  %s\n' "$(human "$kb")" "$p"
     done
     rm -f "$tmp"
   done
 
-  printf '\n  %sLọc project bỏ hoang trên %s ngày:%s\n' "$B" "${PROJ_DAYS:-60}" "$R"
+  # shellcheck disable=SC2059
+  printf '\n  %s%s%s\n' "$B" "$(printf "$T_PROJ_STALE" "${PROJ_DAYS:-60}")" "$R"
   printf '     find %s -name node_modules -type d -prune -mtime +%s -print\n' "$root" "${PROJ_DAYS:-60}"
-  printf '  %sXem kỹ danh sách rồi mới thêm -exec rm -rf {} +%s\n' "$DIM" "$R"
+  printf '  %s%s%s\n' "$DIM" "$T_PROJ_WARN" "$R"
 }

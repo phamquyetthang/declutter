@@ -1,0 +1,78 @@
+# declutter
+
+> A disk cleanup CLI for developers on macOS and Ubuntu, written in pure bash
+> (3.2+, no dependencies). It scans the machine, shows a checkbox list with real
+> sizes, pre-ticks only provably safe caches, and deletes nothing until the user
+> confirms. Its distinguishing focus is the junk AI coding tools leave behind —
+> Claude Code / Codex / Gemini CLI transcripts, AI chat webview storage in VS Code
+> and Cursor, HuggingFace caches, Ollama model weights — which `apt clean` and
+> `brew cleanup` do not touch.
+
+Repository: https://github.com/phamquyetthang/declutter
+License: MIT
+Language: bash
+Platforms: macOS (Intel & Apple Silicon), Ubuntu/Debian
+
+## Install
+
+```
+curl -fsSL https://raw.githubusercontent.com/phamquyetthang/declutter/main/install.sh | bash
+```
+
+Installs to `~/.local/bin/declutter` (override with `PREFIX`). Uninstall with
+`./install.sh --uninstall`.
+
+## Core concepts
+
+- Three safety tiers. **green** = caches that provably regenerate, pre-ticked.
+  **yellow** = you lose history or a long rebuild, never pre-ticked.
+  **red** = real data or a decision only the user can make (`node_modules`, Ollama
+  models, Docker volumes, Xcode Archives, Maven repo); reported with its size but
+  **not selectable**, and no flag can make the tool delete it. `--level red` is
+  rejected on purpose.
+- Nothing is deleted without confirmation: the user presses Enter, or passes `--yes`.
+- `--dry-run` logs every exact path it would remove and touches no disk.
+- Items whose paths do not exist are never listed.
+- Every action is appended to `~/.declutter.log`.
+
+## Commands
+
+- `declutter` — scan, interactive checkbox list, Enter to clean
+- `declutter --report` — print the list, exit, delete nothing
+- `declutter --json` — the same list as one JSON object (for scripts and agents)
+- `declutter --yes` — clean the green tier without the list
+- `declutter --yes -l yellow` — include the yellow tier
+- `declutter --dry-run --yes` — rehearse and log, delete nothing
+- `declutter --projects [DIR]` — list heavy node_modules/target/.venv (never deletes)
+- `declutter --only GROUPS` / `--skip GROUPS` — filter by group, comma-separated
+- `declutter --days N` — "old" threshold for transcripts and --projects (default 60)
+- `declutter --lang en|vi` — interface language (auto-detected from $LANG)
+- `declutter --deep` — enable slow scans (walk $HOME for __pycache__)
+
+## Groups
+
+`ai-cli` `ai-ide` `ai-ml` `ai-model` `pkg-node` `pkg-python` `pkg-rust` `pkg-go`
+`pkg-java` `docker` `browser` `os` `xcode`
+
+## JSON contract (stable from 1.1.0)
+
+Top level: `version`, `platform`, `lang`, `level`, `dry_run`, `free_kb`,
+`free_human`, `items[]`, `totals{items,preselected,preselected_kb,preselected_human}`.
+Each item: `level`, `group`, `action`, `desc`, `size_kb`, `size_human`, `paths[]`,
+`selectable` (false for red), `preselected`.
+
+## Never touched
+
+`~/.ssh`, `~/.gnupg`, `~/.aws`, `.env` files, login tokens,
+`~/.claude/settings.json` and `skills`/`agents`/`memory`, VS Code
+`User/settings.json`/`keybindings.json`/`snippets`/`History`, browser profiles
+(only cache directories are in scope), Docker volumes, Xcode Archives, the Maven
+repo, Timeshift/Time Machine snapshots, `node_modules` and `target/`.
+
+## Docs
+
+- [README (English)](https://github.com/phamquyetthang/declutter/blob/main/README.md): install, usage, safety tiers, FAQ
+- [README (Tiếng Việt)](https://github.com/phamquyetthang/declutter/blob/main/README.vi.md)
+- [Manual cleanup guide (English)](https://github.com/phamquyetthang/declutter/blob/main/docs/GUIDE.md): every command by hand, each labelled with a safety tier
+- [Manual cleanup guide (Tiếng Việt)](https://github.com/phamquyetthang/declutter/blob/main/docs/GUIDE.vi.md)
+- [AGENTS.md](https://github.com/phamquyetthang/declutter/blob/main/AGENTS.md): repository conventions for coding agents

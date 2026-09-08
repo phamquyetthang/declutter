@@ -1,0 +1,43 @@
+#compdef declutter
+# zsh completion for declutter
+#   fpath=(/path/to/declutter/completions $fpath)   # in ~/.zshrc, before compinit
+
+_declutter() {
+  local -a groups
+  groups=(
+    'ai-cli:terminal AI assistants'
+    'ai-ide:VS Code / Cursor / Windsurf / JetBrains'
+    'ai-ml:ML library caches'
+    'ai-model:local model weights (report only)'
+    'pkg-node:npm / yarn / pnpm / bun'
+    'pkg-python:pip / uv / Poetry / conda'
+    'pkg-rust:Cargo'
+    'pkg-go:Go build and module cache'
+    'pkg-java:Gradle / Maven'
+    'docker:Docker build cache and images'
+    'browser:browser page caches'
+    'os:OS-level caches, logs, packages'
+    'xcode:Xcode and iOS simulators (macOS)'
+  )
+
+  _arguments -s \
+    '(-l --level)'{-l,--level}'[highest tier pre-ticked]:level:(green yellow)' \
+    '(-y --yes)'{-y,--yes}'[skip the list, act on --level]' \
+    '(-n --dry-run)'{-n,--dry-run}'[log what would go, delete nothing]' \
+    '--report[print the list and exit]' \
+    '--json[print the list as JSON and exit]' \
+    '--only[only these groups]:groups:_values -s , group ${groups}' \
+    '--skip[skip these groups]:groups:_values -s , group ${groups}' \
+    '--deep[enable the slow scans]' \
+    '--projects[list heavy project artifacts]:directory:_files -/' \
+    '--days[old threshold in days]:days:' \
+    '--top[max rows per listing]:rows:' \
+    '--sudo[force sudo on or off]:sudo:(yes no)' \
+    '--log[log file]:file:_files' \
+    '--lang[interface language]:lang:(en vi)' \
+    '(-q --quiet)'{-q,--quiet}'[less chatter]' \
+    '(-V --version)'{-V,--version}'[print version]' \
+    '(-h --help)'{-h,--help}'[show help]'
+}
+
+_declutter "$@"

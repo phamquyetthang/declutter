@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>declutter — free up disk space on a dev machine (macOS &amp; Ubuntu)</title>
+<meta name="description" content="A pure-bash disk cleanup CLI for developers on macOS and Ubuntu. Reclaims space from AI tool caches — Claude Code, Cursor, VS Code, HuggingFace, Ollama — plus npm, Cargo, Gradle, Docker and Xcode. Nothing is deleted without your confirmation.">
+<link rel="canonical" href="https://phamquyetthang.github.io/declutter/">
+<meta name="theme-color" content="#0d1117">
+<meta name="author" content="phamquyetthang">
+<meta name="keywords" content="disk cleanup cli, free up disk space mac, clean disk space ubuntu, developer disk cleanup, clear xcode deriveddata, delete node_modules, huggingface cache clear, ollama model disk space, claude code cache, cursor cache cleanup, bash cleanup script">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="declutter">
+<meta property="og:title" content="declutter — free up disk space on a dev machine">
+<meta property="og:description" content="Pure-bash disk cleanup CLI for macOS and Ubuntu, focused on the junk AI coding tools leave behind. Checkbox list with real sizes, three safety tiers, nothing deleted without confirmation.">
+<meta property="og:url" content="https://phamquyetthang.github.io/declutter/">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="declutter — free up disk space on a dev machine">
+<meta name="twitter:description" content="Pure-bash disk cleanup CLI for macOS and Ubuntu, focused on AI tool caches. Nothing deleted without confirmation.">
+
+<link rel="alternate" hreflang="en" href="https://phamquyetthang.github.io/declutter/">
+<link rel="alternate" hreflang="vi" href="https://github.com/phamquyetthang/declutter/blob/main/README.vi.md">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "declutter",
+  "applicationCategory": "DeveloperApplication",
+  "applicationSubCategory": "Command Line Utility",
+  "operatingSystem": "macOS, Ubuntu, Debian",
+  "description": "A disk cleanup CLI for developers on macOS and Ubuntu, written in pure bash with no dependencies. It scans the machine, shows a checkbox list with real sizes, pre-ticks only provably safe caches, and deletes nothing until confirmed. Its focus is the junk AI coding tools leave behind: Claude Code, Codex and Gemini CLI transcripts, AI chat webview storage in VS Code and Cursor, HuggingFace caches and Ollama model weights.",
+  "url": "https://phamquyetthang.github.io/declutter/",
+  "downloadUrl": "https://github.com/phamquyetthang/declutter",
+  "codeRepository": "https://github.com/phamquyetthang/declutter",
+  "programmingLanguage": "Shell",
+  "softwareVersion": "1.1.0",
+  "license": "https://opensource.org/licenses/MIT",
+  "isAccessibleForFree": true,
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "author": {
+    "@type": "Person",
+    "name": "phamquyetthang",
+    "url": "https://github.com/phamquyetthang"
+  },
+  "featureList": [
+    "Interactive checkbox list showing real measured sizes",
+    "Three safety tiers; only provably regenerable caches are pre-ticked",
+    "Cleans AI tool caches other cleaners miss",
+    "Dry-run mode that logs every path it would delete",
+    "JSON output for scripts and AI agents",
+    "Pure bash 3.2, no dependencies, no telemetry, no network calls"
+  ]
+}
+</script>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Is declutter safe to run?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "It deletes nothing until you confirm, and the pre-ticked tier is caches only. The test suite asserts that a default run leaves ~/.ssh, ~/.claude/settings.json, VS Code settings, workspaceStorage, the Maven repo and every transcript untouched. Run 'declutter --dry-run --yes' first to read the exact list of paths before anything happens."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Will it delete my Claude Code chat history?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Not at the default tier. Transcripts in ~/.claude/projects sit in the 'your call' tier, are never pre-ticked, and only entries older than 60 days (configurable with --days) are ever considered. Deleting them means losing --resume for those sessions. Settings, skills, agents and memory are in the never-touch list."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How much disk space does declutter free up?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "On a working developer machine, typically 5 to 40 GB. The usual biggest wins are VS Code and Cursor WebStorage and caches, the npx cache, the Cargo registry cache, Xcode DerivedData on macOS, and the Docker build cache. Run 'declutter --report' to see your own numbers before deciding anything."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Does it work on macOS?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. macOS and Ubuntu/Debian are the two supported platforms from the same script. It runs on the bash 3.2 that macOS ships, and CI tests every commit on macos-latest with /bin/bash for that reason. Xcode, Homebrew, simulator and iOS DeviceSupport cleanup are macOS-only groups."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How is declutter different from CleanMyMac, BleachBit or brew cleanup?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Those clean the operating system. declutter cleans the developer toolchain, and in particular the AI tool directories none of them know about: AI chat webview storage, model caches and CLI transcripts. It is also a small bash script with no daemon, no telemetry and no subscription, so you can read everything it will ever delete before you run it."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How do I uninstall declutter?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Run './install.sh --uninstall', or delete ~/.local/bin/declutter and ~/.local/share/declutter by hand. Your log at ~/.declutter.log is left alone."
+      }
+    }
+  ]
+}
+</script>
+
+<style>
+  :root {
+    --bg: #ffffff; --fg: #1f2328; --muted: #59636e; --line: #d1d9e0;
+    --accent: #0969da; --code-bg: #f6f8fa; --term-bg: #0d1117; --term-fg: #e6edf3;
+    --green: #1a7f37; --yellow: #9a6700; --red: #cf222e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0d1117; --fg: #e6edf3; --muted: #9198a1; --line: #3d444d;
+      --accent: #4493f8; --code-bg: #151b23; --term-bg: #010409; --term-fg: #e6edf3;
+      --green: #3fb950; --yellow: #d29922; --red: #f85149;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 0 20px; }
+  header { padding: 64px 0 40px; border-bottom: 1px solid var(--line); }
+  h1 { font-size: 40px; line-height: 1.15; margin: 0 0 12px; letter-spacing: -0.02em; }
+  h1 .dim { color: var(--muted); font-weight: 400; }
+  .lede { font-size: 19px; color: var(--muted); margin: 0 0 28px; max-width: 62ch; }
+  .badges { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 28px; }
+  .badges img { height: 20px; }
+  h2 { font-size: 24px; margin: 48px 0 12px; letter-spacing: -0.01em; }
+  h3 { font-size: 17px; margin: 28px 0 6px; }
+  p { margin: 0 0 14px; }
+  a { color: var(--accent); }
+  code, pre { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; }
+  code { background: var(--code-bg); padding: 0.15em 0.4em; border-radius: 5px; font-size: 0.88em; }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px;
+    padding: 14px 16px; overflow-x: auto; font-size: 13.5px; line-height: 1.55; margin: 0 0 16px;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; }
+  .term {
+    background: var(--term-bg); color: var(--term-fg); border-color: #30363d;
+    font-size: 12.5px; line-height: 1.5;
+  }
+  .term .g { color: #3fb950; } .term .y { color: #d29922; } .term .r { color: #f85149; }
+  .term .m { color: #9198a1; } .term .c { color: #56d4dd; }
+  table { border-collapse: collapse; width: 100%; margin: 0 0 20px; font-size: 15px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+  .tier-o { color: var(--green); font-weight: 600; }
+  .tier-y { color: var(--yellow); font-weight: 600; }
+  .tier-x { color: var(--red); font-weight: 600; }
+  ul { padding-left: 22px; margin: 0 0 16px; }
+  li { margin-bottom: 6px; }
+  .cta { display: inline-block; background: var(--accent); color: #fff; text-decoration: none;
+         padding: 10px 20px; border-radius: 7px; font-weight: 600; margin: 4px 8px 4px 0; }
+  .cta.ghost { background: none; color: var(--accent); border: 1px solid var(--line); }
+  footer { margin: 64px 0 48px; padding-top: 24px; border-top: 1px solid var(--line);
+           color: var(--muted); font-size: 14px; }
+  .langbar { font-size: 14px; color: var(--muted); margin-bottom: 24px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <p class="langbar">English · <a href="https://github.com/phamquyetthang/declutter/blob/main/README.vi.md">Tiếng Việt</a></p>
+  <h1>declutter <span class="dim">— free up disk space on a dev machine</span></h1>
+  <p class="lede">
+    A disk cleanup CLI for developers on <strong>macOS</strong> and <strong>Ubuntu</strong>.
+    It scans your machine, shows a checkbox list with real sizes, pre-ticks only what is
+    provably safe, and deletes nothing until you press Enter.
+  </p>
+  <div class="badges">
+    <a href="https://github.com/phamquyetthang/declutter/actions/workflows/ci.yml"><img src="https://github.com/phamquyetthang/declutter/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
+    <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT license">
+    <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Ubuntu-lightgrey.svg" alt="Platforms: macOS and Ubuntu">
+    <img src="https://img.shields.io/badge/pure-bash%203.2%2B-89e051.svg" alt="Pure bash 3.2+">
+  </div>
+  <a class="cta" href="https://github.com/phamquyetthang/declutter">View on GitHub</a>
+  <a class="cta ghost" href="https://github.com/phamquyetthang/declutter/blob/main/docs/GUIDE.md">Manual cleanup guide</a>
+</header>
+
+<h2>Why another cleaner?</h2>
+<p>
+  Because the fastest-growing directories on a developer's machine today belong to
+  <strong>AI coding tools</strong>, and nothing cleans them. Claude Code, Codex and Gemini CLI
+  transcripts. The WebStorage behind AI chat panels in VS Code and Cursor — routinely
+  <strong>3 GB</strong> on its own. HuggingFace caches. Ollama weights measured in tens of
+  gigabytes. <code>apt clean</code> and <code>brew cleanup</code> never touch a byte of it.
+</p>
+<p>
+  <code>declutter</code> covers those first, then everything else a dev machine accumulates:
+  npm, Cargo, Gradle, Go, pip, Docker, browser caches, Xcode DerivedData.
+</p>
+
+<h2>Install</h2>
+<p>One command, same on Linux and macOS:</p>
+<pre><code>curl -fsSL https://raw.githubusercontent.com/phamquyetthang/declutter/main/install.sh | bash</code></pre>
+<p>
+  Installs into <code>~/.local/bin</code> (override with <code>PREFIX</code>). No git on the
+  machine? It falls back to a tarball. Prefer not to install at all — clone it and run
+  <code>./declutter</code> in place. To remove it: <code>./install.sh --uninstall</code>.
+</p>
+
+<h2>What it looks like</h2>
+<pre class="term"><code><span class="c">declutter</span>  —  linux  —  14.1G free on /
+<span class="m">o = safe (pre-ticked)   ! = your call   x = manual only, not selectable</span>
+<span class="m">──────────────────────────────────────────────────────────────────────────</span>
+  [<span class="g">x</span>] <span class="g">o</span>     3.0G  Code: WebStorage (AI webview panels)           <span class="m">ai-ide</span>
+&gt; [<span class="g">x</span>] <span class="g">o</span>     1.3G  npx cache                                      <span class="m">pkg-node</span>
+  [<span class="g">x</span>] <span class="g">o</span>     430M  Cargo registry cache (re-fetched on build)     <span class="m">pkg-rust</span>
+  [ ] <span class="y">!</span>     250M  Claude Code: transcripts older than 60d (bre…  <span class="m">ai-cli</span>
+  [ ] <span class="y">!</span>      42M  Code: Copilot Chat history                     <span class="m">ai-ide</span>
+    -  <span class="r">x</span>     2.2G  Installed extensions (remove: code --uninst…   <span class="m">ai-ide</span>
+<span class="m">──────────────────────────────────────────────────────────────────────────</span>
+  Selected: 12 items — 1.8G
+  <span class="m">[↑↓/jk] move   [space] toggle   [a] invert all   [o] safe only</span>
+  <span class="m">[n] clear   [enter] CLEAN   [q] quit</span></code></pre>
+
+<h2>Three safety tiers</h2>
+<table>
+  <thead><tr><th>Tier</th><th>Meaning</th><th>Default</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><span class="tier-o">o safe</span></td>
+      <td>Caches that provably regenerate. Losing them only makes the next build or install slower.</td>
+      <td><strong>Pre-ticked</strong></td>
+    </tr>
+    <tr>
+      <td><span class="tier-y">! your call</span></td>
+      <td>You lose history (transcripts, Copilot Chat), or a rebuild takes a long time (Gradle caches, Go modcache).</td>
+      <td>Unticked, you turn it on</td>
+    </tr>
+    <tr>
+      <td><span class="tier-x">x manual only</span></td>
+      <td>Real data, or something only you know you still need: <code>node_modules</code>, Ollama models, Docker volumes, Xcode Archives, the Maven repo.</td>
+      <td><strong>Not selectable.</strong> Size is shown so you can deal with it yourself</td>
+    </tr>
+  </tbody>
+</table>
+<p><code>--level red</code> is refused on purpose: no flag makes this tool delete a red item for you.</p>
+
+<h2>Usage</h2>
+<pre><code>declutter                  # scan → pick → Enter. Deletes NOTHING by default.
+declutter --report         # print the list and exit
+declutter --json           # same list as JSON, for scripts and agents
+declutter --yes            # skip the list, clean the safe tier
+declutter --yes -l yellow  # include the "your call" tier
+declutter --dry-run --yes  # rehearse: log what WOULD go, touch nothing
+declutter --projects       # list heavy node_modules/target/.venv
+declutter --only ai-ide    # clean IDE caches only
+declutter --lang vi        # Vietnamese interface (auto-detected from $LANG)</code></pre>
+
+<h2>What it never touches</h2>
+<p>
+  <code>~/.ssh</code> · <code>~/.gnupg</code> · <code>~/.aws</code> · <code>.env</code> files ·
+  login tokens · <code>~/.claude/settings.json</code>, <code>skills</code>, <code>agents</code>,
+  <code>memory</code> · VS Code <code>User/settings.json</code>, <code>keybindings.json</code>,
+  <code>snippets</code>, <code>User/History</code> · browser profiles (only cache directories are
+  in scope) · Docker volumes · Xcode Archives · the Maven repo · Timeshift and Time Machine
+  snapshots · <code>node_modules</code> and <code>target/</code>, which are listed but never removed.
+</p>
+
+<h2>JSON output, for scripts and AI agents</h2>
+<p><code>declutter --json</code> prints the same list as one JSON object, so an agent can decide what to clean without driving the TUI:</p>
+<pre><code>declutter --json | jq -r '.items[] | select(.level=="green")
+  | "\(.size_human)\t\(.desc)"' | head -5</code></pre>
+
+<h2>Frequently asked questions</h2>
+
+<h3>Is it safe to run?</h3>
+<p>
+  It deletes nothing until you say so, and the pre-ticked tier is caches only. The tests
+  assert that a default run leaves <code>~/.ssh</code>, <code>~/.claude/settings.json</code>,
+  VS Code settings, <code>workspaceStorage</code>, the Maven repo and every transcript
+  untouched. Run <code>declutter --dry-run --yes</code> first to read the exact list of paths.
+</p>
+
+<h3>Will it delete my Claude Code chat history?</h3>
+<p>
+  Not at the default tier. Transcripts sit in the <code>!</code> tier, are never pre-ticked, and
+  only entries older than <code>--days N</code> (60 by default) are ever considered. Settings,
+  skills, agents and memory are in the never-touch list.
+</p>
+
+<h3>How much space does it actually free?</h3>
+<p>
+  On a working developer machine, typically 5–40 GB. The usual biggest wins are VS Code and
+  Cursor caches, <code>~/.npm/_npx</code>, the Cargo registry cache, Xcode
+  <code>DerivedData</code>, and the Docker build cache. Run <code>declutter --report</code> to
+  see your own numbers first.
+</p>
+
+<h3>Does it work on macOS?</h3>
+<p>
+  Yes — macOS and Ubuntu/Debian, from the same script. It runs on the bash 3.2 that macOS
+  ships, and CI tests every commit on <code>macos-latest</code> with <code>/bin/bash</code> for
+  that reason.
+</p>
+
+<h3>How is this different from CleanMyMac, BleachBit or <code>brew cleanup</code>?</h3>
+<p>
+  Those clean the operating system. <code>declutter</code> cleans the developer toolchain, and
+  in particular the AI tool directories none of them know about. It is also a small bash
+  script with no daemon, no telemetry and no subscription — you can read everything it will
+  ever delete before you run it.
+</p>
+
+<h3>Does it phone home?</h3>
+<p>No. There is no network call anywhere in the tool. <code>install.sh</code> is the only thing that downloads, and only from GitHub.</p>
+
+<h2>Documentation</h2>
+<ul>
+  <li><a href="https://github.com/phamquyetthang/declutter#readme">README</a> — install, usage, safety tiers, FAQ</li>
+  <li><a href="https://github.com/phamquyetthang/declutter/blob/main/docs/GUIDE.md">Manual cleanup guide</a> — every command by hand for macOS and Ubuntu, each labelled with its safety tier</li>
+  <li><a href="https://github.com/phamquyetthang/declutter/blob/main/AGENTS.md">AGENTS.md</a> — repository conventions for contributors and coding agents</li>
+  <li><a href="https://github.com/phamquyetthang/declutter/blob/main/README.vi.md">Tiếng Việt</a> — Vietnamese documentation</li>
+</ul>
+
+<footer>
+  MIT © <a href="https://github.com/phamquyetthang">phamquyetthang</a> ·
+  <a href="https://github.com/phamquyetthang/declutter">source</a> ·
+  <a href="https://github.com/phamquyetthang/declutter/issues">issues</a>
+</footer>
+
+</div>
+</body>
+</html>
