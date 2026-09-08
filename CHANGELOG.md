@@ -43,7 +43,7 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 - Code comments, log lines, the test suite and CI step names are now English.
   Vietnamese lives in the `*.vi.md` docs and in the runtime string catalog.
-- The test suite grew from 52 to 68 assertions, covering the JSON contract, both
+- The test suite grew from 52 to 69 assertions, covering the JSON contract, both
   languages, group validation, red-advisory visibility and the installer round
   trip.
 

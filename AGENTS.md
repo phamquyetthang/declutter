@@ -90,7 +90,9 @@ Two traps worth knowing:
   grep exits at the first match, declutter dies of SIGPIPE, and the pipeline reads
   as a failure even though the text was there. Write the output to a file first.
 - `DECLUTTER_LANG=en` is exported so assertions on output text do not depend on
-  the host locale.
+  the host locale. When you test locale detection itself, `env -u` the higher
+  precedence variables — the order is `LC_ALL` > `LC_MESSAGES` > `LANG`, and CI
+  runners set `LC_ALL`, so merely setting `LANG` proves nothing.
 
 Any change that touches deletion behaviour needs a matching assertion: what must
 go, and what must survive.

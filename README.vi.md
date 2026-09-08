@@ -198,7 +198,7 @@ từ GitHub.
 ## Phát triển
 
 ```bash
-./tests/run.sh     # 68 assertion trong một $HOME giả, không đụng máy thật
+./tests/run.sh     # 69 assertion trong một $HOME giả, không đụng máy thật
 ```
 
 Test đặt `DECLUTTER_SKIP_CMD=1` vì các mục dạng lệnh (`docker builder prune`,

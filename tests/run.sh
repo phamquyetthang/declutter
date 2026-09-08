@@ -154,11 +154,23 @@ if in_report 'Tick sẵn'; then
 else
   bad "--lang vi did not render Vietnamese"
 fi
-LANG=vi_VN.UTF-8 DECLUTTER_LANG= "$ROOT/declutter" --report > "$SB/report.txt" 2>/dev/null
+# LC_ALL and LC_MESSAGES have to be unset, not just LANG set: the precedence is
+# LC_ALL > LC_MESSAGES > LANG (POSIX), and CI runners set LC_ALL — which would
+# correctly beat the LANG we are trying to test.
+env -u LC_ALL -u LC_MESSAGES -u DECLUTTER_LANG LANG=vi_VN.UTF-8 \
+  "$ROOT/declutter" --report > "$SB/report.txt" 2>/dev/null
 if in_report 'Tick sẵn'; then
   ok "\$LANG=vi_VN is auto-detected"
 else
   bad "\$LANG=vi_VN was not auto-detected"
+fi
+# The other half of that precedence: LC_ALL must win over LANG.
+env -u LC_MESSAGES -u DECLUTTER_LANG LC_ALL=en_US.UTF-8 LANG=vi_VN.UTF-8 \
+  "$ROOT/declutter" --report > "$SB/report.txt" 2>/dev/null
+if in_report 'Pre-ticked'; then
+  ok "\$LC_ALL takes precedence over \$LANG"
+else
+  bad "\$LC_ALL did not take precedence over \$LANG"
 fi
 report_to --lang en
 if in_report 'Pre-ticked'; then

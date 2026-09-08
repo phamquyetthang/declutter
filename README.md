@@ -206,7 +206,7 @@ that downloads, and only from GitHub.
 ## Development
 
 ```bash
-./tests/run.sh     # 68 assertions inside a fake $HOME, your real machine untouched
+./tests/run.sh     # 69 assertions inside a fake $HOME, your real machine untouched
 ```
 
 The tests set `DECLUTTER_SKIP_CMD=1` because command-style items
